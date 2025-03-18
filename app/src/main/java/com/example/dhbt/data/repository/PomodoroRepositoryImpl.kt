@@ -8,6 +8,7 @@ import com.example.dhbt.domain.model.PomodoroSession
 import com.example.dhbt.domain.model.PomodoroSessionType
 import com.example.dhbt.domain.repository.PomodoroRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 import javax.inject.Inject

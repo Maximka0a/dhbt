@@ -1,6 +1,7 @@
 package com.example.dhbt.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import java.util.UUID
@@ -14,7 +15,8 @@ import java.util.UUID
             childColumns = ["habitId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [Index("habitId")] // Добавленный индекс
 )
 data class HabitTrackingEntity(
     @PrimaryKey
@@ -22,7 +24,7 @@ data class HabitTrackingEntity(
     val habitId: String,
     val date: Long,
     val isCompleted: Boolean = false,
-    val value: Float? = null, // Значение для количественных привычек
-    val duration: Int? = null, // Продолжительность для временных привычек в минутах
-    val notes: String? = null // Заметки пользователя
+    val value: Float? = null,
+    val duration: Int? = null,
+    val notes: String? = null
 )

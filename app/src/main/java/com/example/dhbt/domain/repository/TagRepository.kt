@@ -12,4 +12,5 @@ interface TagRepository {
     suspend fun deleteTag(tagId: String)
 
     fun getTasksWithTag(tagId: String): Flow<List<Task>>
+    fun getTagsForTask(taskId: String): Flow<List<Tag>>
 }

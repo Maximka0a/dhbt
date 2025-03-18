@@ -1,6 +1,7 @@
 package com.example.dhbt.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import java.util.UUID
@@ -14,7 +15,8 @@ import java.util.UUID
             childColumns = ["taskId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [Index("taskId")] // Добавленный индекс
 )
 data class SubtaskEntity(
     @PrimaryKey
@@ -23,5 +25,5 @@ data class SubtaskEntity(
     val title: String,
     val isCompleted: Boolean = false,
     val completionDate: Long? = null,
-    val order: Int = 0 // Порядок отображения подзадачи в списке
+    val order: Int = 0
 )

@@ -46,7 +46,7 @@ dependencies {
 
     // Date & Time
     implementation(libs.threetenabp)
-
+    implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.foundation)
     implementation(libs.kotlinx.serialization.json)
     implementation( libs.compose)

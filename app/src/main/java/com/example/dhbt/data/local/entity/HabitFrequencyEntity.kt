@@ -1,6 +1,7 @@
 package com.example.dhbt.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import java.util.UUID
@@ -14,14 +15,15 @@ import java.util.UUID
             childColumns = ["habitId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [Index("habitId")] // Добавленный индекс
 )
 data class HabitFrequencyEntity(
     @PrimaryKey
     val frequencyId: String = UUID.randomUUID().toString(),
     val habitId: String,
-    val frequencyType: Int, // 0-ежедневно, 1-определенные дни недели, 2-X раз в неделю, 3-X раз в месяц
-    val daysOfWeek: String? = null, // JSON-массив с днями недели
-    val timesPerPeriod: Int? = null, // Количество раз для выполнения в период
-    val periodType: Int? = null // 0-неделя, 1-месяц
+    val frequencyType: Int,
+    val daysOfWeek: String? = null,
+    val timesPerPeriod: Int? = null,
+    val periodType: Int? = null
 )

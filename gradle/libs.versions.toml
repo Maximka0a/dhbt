@@ -20,6 +20,7 @@ navigationComposeTyped = "0.6.0"
 opencsv = "5.7.1"
 poiOoxml = "5.2.3"
 poi = "5.2.3"
+preferenceKtx = "1.2.1"
 retrofit2KotlinxSerializationConverter = "1.0.0"
 room = "2.6.1"
 hilt = "2.55"
@@ -53,6 +54,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-navigation-compose-typed = { module = "androidx.navigation:navigation-compose-typed", version.ref = "navigationComposeTyped" }
+androidx-preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preferenceKtx" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }

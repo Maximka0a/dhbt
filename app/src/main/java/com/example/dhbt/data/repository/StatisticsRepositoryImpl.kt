@@ -12,6 +12,7 @@ import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskStatus
 import com.example.dhbt.domain.repository.StatisticsRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId

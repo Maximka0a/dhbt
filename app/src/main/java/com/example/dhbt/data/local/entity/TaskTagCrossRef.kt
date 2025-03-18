@@ -1,6 +1,7 @@
 package com.example.dhbt.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.ForeignKey
 
 @Entity(
@@ -19,7 +20,11 @@ import androidx.room.ForeignKey
             childColumns = ["tagId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [
+        Index("taskId"),
+        Index("tagId")
+    ] // Добавленные индексы
 )
 data class TaskTagCrossRef(
     val taskId: String,

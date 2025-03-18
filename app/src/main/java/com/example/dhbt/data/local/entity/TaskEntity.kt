@@ -1,6 +1,7 @@
 package com.example.dhbt.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import java.util.UUID
@@ -14,7 +15,8 @@ import java.util.UUID
             childColumns = ["categoryId"],
             onDelete = ForeignKey.SET_NULL
         )
-    ]
+    ],
+    indices = [Index("categoryId")] // Добавленный индекс
 )
 data class TaskEntity(
     @PrimaryKey

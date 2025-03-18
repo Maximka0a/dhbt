@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import com.example.dhbt.data.NotificationReceiver
 import com.example.dhbt.data.local.dao.NotificationDao
 import com.example.dhbt.data.mapper.NotificationMapper
 import com.example.dhbt.domain.model.Notification
@@ -11,6 +12,7 @@ import com.example.dhbt.domain.model.NotificationTarget
 import com.example.dhbt.domain.repository.NotificationRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.threeten.bp.LocalTime
 import org.threeten.bp.format.DateTimeFormatter
