@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.dhbt.domain.model.AppTheme
+import com.example.dhbt.presentation.dashboard.DashboardScreen
 import com.example.dhbt.presentation.navigation.DHbtBottomNavigation
 import com.example.dhbt.presentation.navigation.DHbtNavHost
 import com.example.dhbt.presentation.navigation.Dashboard
@@ -45,7 +46,14 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-
+            DashboardScreen(
+                onTaskClick = {},
+                onHabitClick = {},
+                onAddTask = {},
+                onAddHabit = {},
+                onViewAllTasks = {},
+                onViewAllHabits = {},
+            )
         }
     }
 }

@@ -10,13 +10,14 @@
     <string name="more">Еще</string>
 
     <!-- Dashboard Screen -->
-    <string name="welcome_message">Добро пожаловать!</string>
-    <string name="tasks_for_today">Задачи на сегодня</string>
     <string name="habits_for_today">Привычки на сегодня</string>
-    <string name="view_all_tasks">Все задачи</string>
-    <string name="view_all_habits">Все привычки</string>
-    <string name="add_new_item">Добавить</string>
-    <string name="daily_progress">Дневной прогресс</string>
+    <string name="tasks_for_today">Задачи на сегодня</string>
+    <string name="see_all">Смотреть все</string>
+    <string name="no_tasks_for_today">Нет задач на сегодня</string>
+    <string name="no_habits_for_today">Нет привычек на сегодня</string>
+    <string name="add">Добавить</string>
+    <string name="close">Закрыть</string>
+
 
     <!-- Tasks Screen -->
     <string name="no_tasks">Нет задач</string>

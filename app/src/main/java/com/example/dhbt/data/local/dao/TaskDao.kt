@@ -44,4 +44,7 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET completionDate = :completionDate WHERE taskId = :taskId")
     suspend fun updateTaskCompletion(taskId: String, completionDate: Long)
+
+    @Query("UPDATE tasks SET completionDate = :completionDate WHERE taskId = :taskId")
+    suspend fun updateTaskCompletion(taskId: String, completionDate: Long?)
 }

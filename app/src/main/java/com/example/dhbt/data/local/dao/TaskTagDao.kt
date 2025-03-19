@@ -26,4 +26,7 @@ interface TaskTagDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM task_tag_cross_refs WHERE taskId = :taskId AND tagId = :tagId)")
     suspend fun isTaskTagged(taskId: String, tagId: String): Boolean
+
+    @Query("SELECT * FROM task_tag_cross_refs WHERE taskId = :taskId")
+    suspend fun getTaskTagCrossRefsForTask(taskId: String): List<TaskTagCrossRef>
 }

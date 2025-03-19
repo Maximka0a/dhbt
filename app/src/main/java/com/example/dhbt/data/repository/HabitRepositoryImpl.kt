@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
+import java.util.UUID
 import javax.inject.Inject
 
 class HabitRepositoryImpl @Inject constructor(
@@ -50,7 +51,77 @@ class HabitRepositoryImpl @Inject constructor(
             }
         }
     }
+    // Добавляем реализацию метода incrementHabitProgress
+    override suspend fun incrementHabitProgress(habitId: String) {
+        // Получаем привычку
+        val habit = getHabitById(habitId) ?: return
 
+        // Получаем текущую дату
+        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        // Проверяем, есть ли уже запись за сегодняшний день
+        val existingTracking = getHabitTrackingForDate(habitId, today)
+
+        if (existingTracking != null) {
+            // Обновляем существующую запись
+            when (habit.type) {
+                HabitType.BINARY -> {
+                    // Для бинарного типа просто отмечаем как выполненное
+                    val updatedTracking = existingTracking.copy(
+                        isCompleted = true
+                    )
+                    updateHabitTracking(updatedTracking)
+                }
+                HabitType.QUANTITY -> {
+                    // Для количественного типа увеличиваем значение на 1
+                    val currentValue = existingTracking.value ?: 0f
+                    val newValue = currentValue + 1
+                    val targetValue = habit.targetValue ?: 1f
+                    val isCompleted = newValue >= targetValue
+
+                    val updatedTracking = existingTracking.copy(
+                        value = newValue,
+                        isCompleted = isCompleted
+                    )
+                    updateHabitTracking(updatedTracking)
+                }
+                HabitType.TIME -> {
+                    // Для времени увеличиваем на 1 минуту (или другую логику)
+                    val currentDuration = existingTracking.duration ?: 0
+                    val newDuration = currentDuration + 1 // Предположим, +1 минута
+                    val targetDuration = habit.targetValue?.toInt() ?: 1
+                    val isCompleted = newDuration >= targetDuration
+
+                    val updatedTracking = existingTracking.copy(
+                        duration = newDuration,
+                        isCompleted = isCompleted
+                    )
+                    updateHabitTracking(updatedTracking)
+                }
+            }
+        } else {
+            // Создаем новую запись
+            val isCompleted = when (habit.type) {
+                HabitType.BINARY -> true
+                HabitType.QUANTITY -> 1f >= (habit.targetValue ?: 1f)
+                HabitType.TIME -> 1 >= (habit.targetValue?.toInt() ?: 1)
+            }
+
+            val value = if (habit.type == HabitType.QUANTITY) 1f else null
+            val duration = if (habit.type == HabitType.TIME) 1 else null
+
+            val tracking = HabitTracking(
+                id = UUID.randomUUID().toString(),
+                habitId = habitId,
+                date = today,
+                isCompleted = isCompleted,
+                value = value,
+                duration = duration
+            )
+
+            trackHabit(tracking)
+        }
+    }
     override fun getHabitsByCategory(categoryId: String): Flow<List<Habit>> {
         return habitDao.getHabitsByCategory(categoryId).map { entities ->
             entities.map { entity ->

@@ -9,6 +9,10 @@ interface SubtaskDao {
     @Query("SELECT * FROM subtasks WHERE taskId = :taskId ORDER BY `order` ASC")
     fun getSubtasksForTask(taskId: String): Flow<List<SubtaskEntity>>
 
+    // Добавляем синхронный метод для получения подзадач
+    @Query("SELECT * FROM subtasks WHERE taskId = :taskId")
+    suspend fun getSubtasksForTaskSync(taskId: String): List<SubtaskEntity>
+
     @Query("SELECT * FROM subtasks WHERE subtaskId = :subtaskId")
     suspend fun getSubtaskById(subtaskId: String): SubtaskEntity?
 
