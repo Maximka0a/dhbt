@@ -20,6 +20,7 @@ fun DHbtNavHost(
         modifier = modifier
     ) {
         // Основные экраны
+        /*
         composable<Dashboard> {
             DashboardScreen(
                 onTaskClick = { taskId -> navController.navigate(TaskDetail(taskId)) },
@@ -30,6 +31,8 @@ fun DHbtNavHost(
                 onViewAllHabits = { navController.navigate(Habits) },
                 userName = mainViewModel?.state?.value?.userName  // Передаем имя пользователя
             )
+
+
         }
         composable<Tasks> {
             TasksScreen(
@@ -135,5 +138,7 @@ fun DHbtNavHost(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+
+         */
     }
 }

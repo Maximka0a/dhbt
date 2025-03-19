@@ -1,7 +1,11 @@
 package com.example.dhbt.domain.model
 
+import kotlinx.serialization.Serializable
+import java.util.UUID
+
+@Serializable
 data class UserData(
-    val userId: String,
+    val userId: String = UUID.randomUUID().toString(),
     val name: String = "",
     val email: String? = null,
     val avatarUrl: String? = null,
@@ -11,6 +15,6 @@ data class UserData(
     val isPremium: Boolean = false,
     val premiumExpiryDate: Long? = null,
     val customEmoji: String? = null,
-    val registrationDate: Long,
-    val lastLoginDate: Long
+    val registrationDate: Long = System.currentTimeMillis(),
+    val lastLoginDate: Long = System.currentTimeMillis()
 )
