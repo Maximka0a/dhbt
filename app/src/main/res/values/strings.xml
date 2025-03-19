@@ -1,3 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">dhbt</string>
+    <string name="app_name">DHbt</string>
+
+    <!-- Bottom Navigation -->
+    <string name="dashboard">Главная</string>
+    <string name="tasks">Задачи</string>
+    <string name="habits">Привычки</string>
+    <string name="statistics">Статистика</string>
+    <string name="more">Еще</string>
+
+    <!-- Dashboard Screen -->
+    <string name="welcome_message">Добро пожаловать!</string>
+    <string name="tasks_for_today">Задачи на сегодня</string>
+    <string name="habits_for_today">Привычки на сегодня</string>
+    <string name="view_all_tasks">Все задачи</string>
+    <string name="view_all_habits">Все привычки</string>
+    <string name="add_new_item">Добавить</string>
+    <string name="daily_progress">Дневной прогресс</string>
+
+    <!-- Tasks Screen -->
+    <string name="no_tasks">Нет задач</string>
+    <string name="add_task">Добавить задачу</string>
+    <string name="task_completed">Задача выполнена!</string>
+    <string name="task_deleted">Задача удалена</string>
+    <string name="eisenhower_matrix">Матрица Эйзенхауэра</string>
+    <string name="filter_by_category">Фильтр по категориям</string>
+    <string name="sort_tasks">Сортировка</string>
+
+    <!-- Task Detail -->
+    <string name="task_details">Детали задачи</string>
+    <string name="edit_task">Редактировать</string>
+    <string name="delete_task">Удалить</string>
+    <string name="complete_task">Выполнить</string>
+    <string name="subtasks">Подзадачи</string>
+    <string name="due_date">Срок выполнения</string>
+    <string name="priority">Приоритет</string>
+    <string name="category">Категория</string>
+    <string name="description">Описание</string>
+    <string name="notes">Заметки</string>
+    <string name="tags">Теги</string>
+
+    <!-- Task Edit -->
+    <string name="create_task">Создать задачу</string>
+    <string name="update_task">Обновить задачу</string>
+    <string name="task_title">Название задачи</string>
+    <string name="task_title_hint">Введите название задачи</string>
+    <string name="task_description_hint">Введите описание (опционально)</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="add_subtask">Добавить подзадачу</string>
+    <string name="select_date">Выбрать дату</string>
+    <string name="select_time">Выбрать время</string>
+    <string name="select_category">Выбрать категорию</string>
+    <string name="select_tags">Выбрать теги</string>
+    <string name="low_priority">Низкий</string>
+    <string name="medium_priority">Средний</string>
+    <string name="high_priority">Высокий</string>
+    <string name="set_reminder">Установить напоминание</string>
+
+    <!-- Habits Screen -->
+    <string name="no_habits">Нет привычек</string>
+    <string name="add_habit">Добавить привычку</string>
+    <string name="habit_completed">Привычка отмечена!</string>
+    <string name="streak">Серия: %d дней</string>
+    <string name="best_streak">Рекорд: %d дней</string>
+    <string name="today_progress">Сегодня: %d/%d</string>
+
+    <!-- Habit Detail -->
+    <string name="habit_details">Детали привычки</string>
+    <string name="edit_habit">Редактировать</string>
+    <string name="archive_habit">В архив</string>
+    <string name="delete_habit">Удалить</string>
+    <string name="frequency">Частота</string>
+    <string name="progress">Прогресс</string>
+    <string name="history">История</string>
+
+    <!-- Habit Edit -->
+    <string name="create_habit">Создать привычку</string>
+    <string name="update_habit">Обновить привычку</string>
+    <string name="habit_title">Название привычки</string>
+    <string name="habit_title_hint">Введите название привычки</string>
+    <string name="habit_description_hint">Введите цель или описание</string>
+    <string name="daily">Ежедневно</string>
+    <string name="weekly">Еженедельно</string>
+    <string name="monthly">Ежемесячно</string>
+    <string name="custom">Настраиваемая</string>
+    <string name="habit_type">Тип привычки</string>
+    <string name="binary_habit">Бинарная (да/нет)</string>
+    <string name="quantity_habit">Количественная (с прогрессом)</string>
+    <string name="time_habit">Временная (в минутах)</string>
+    <string name="target_value">Целевое значение</string>
+
+    <!-- Pomodoro -->
+    <string name="pomodoro">Pomodoro</string>
+    <string name="work">Работа</string>
+    <string name="short_break">Короткий перерыв</string>
+    <string name="long_break">Длинный перерыв</string>
+    <string name="start">Старт</string>
+    <string name="pause">Пауза</string>
+    <string name="stop">Стоп</string>
+    <string name="reset">Сброс</string>
+    <string name="pomodoro_settings">Настройки таймера</string>
+    <string name="work_duration">Длительность работы</string>
+    <string name="short_break_duration">Длительность короткого перерыва</string>
+    <string name="long_break_duration">Длительность длинного перерыва</string>
+    <string name="cycles_before_long_break">Циклов до длинного перерыва</string>
+
+    <!-- Statistics -->
+    <string name="statistics_title">Статистика</string>
+    <string name="task_completion">Выполнение задач</string>
+    <string name="habit_consistency">Регулярность привычек</string>
+    <string name="productivity_score">Оценка продуктивности</string>
+    <string name="daily_view">День</string>
+    <string name="weekly_view">Неделя</string>
+    <string name="monthly_view">Месяц</string>
+    <string name="yearly_view">Год</string>
+
+    <!-- Settings -->
+    <string name="settings">Настройки</string>
+    <string name="appearance">Внешний вид</string>
+    <string name="theme">Тема</string>
+    <string name="dark_mode">Темная тема</string>
+    <string name="light_mode">Светлая тема</string>
+    <string name="system_theme">Системная</string>
+    <string name="notifications">Уведомления</string>
+    <string name="language">Язык</string>
+    <string name="data">Данные</string>
+    <string name="backup_restore">Резервное копирование и восстановление</string>
+    <string name="export_data">Экспорт данных</string>
+    <string name="import_data">Импорт данных</string>
+    <string name="clear_data">Очистить данные</string>
+    <string name="about">О приложении</string>
+    <string name="version">Версия</string>
+    <string name="quiet_hours">Тихие часы</string>
+    <string name="quiet_hours_start">Начало тихих часов</string>
+    <string name="quiet_hours_end">Окончание тихих часов</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome">Добро пожаловать в DHbt</string>
+    <string name="onboarding_tasks">Управляйте своими задачами</string>
+    <string name="onboarding_habits">Создавайте полезные привычки</string>
+    <string name="onboarding_pomodoro">Используйте технику Помодоро</string>
+    <string name="onboarding_statistics">Отслеживайте свой прогресс</string>
+    <string name="onboarding_personalization">Персонализация</string>
+    <string name="onboarding_name">Как вас зовут?</string>
+    <string name="onboarding_wakeup_time">Во сколько вы просыпаетесь?</string>
+    <string name="onboarding_sleep_time">Во сколько вы ложитесь спать?</string>
+    <string name="onboarding_goal">Какова ваша главная цель?</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_finish">Начать</string>
+
+    <!-- Subscription -->
+    <string name="premium">Премиум</string>
+    <string name="premium_description">Разблокируйте все функции</string>
+    <string name="monthly_subscription">Месячная подписка</string>
+    <string name="yearly_subscription">Годовая подписка</string>
+    <string name="lifetime_subscription">Пожизненный доступ</string>
+    <string name="subscribe">Подписаться</string>
+    <string name="restore_purchases">Восстановить покупки</string>
+    <string name="premium_features">Премиум-функции</string>
+
+    <!-- Common -->
+    <string name="error_occurred">Произошла ошибка</string>
+    <string name="try_again">Попробуйте снова</string>
+    <string name="loading">Загрузка...</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
+    <string name="ok">OK</string>
+    <string name="confirm">Подтвердить</string>
 </resources>
