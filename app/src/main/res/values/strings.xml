@@ -40,6 +40,10 @@
     <string name="description">Описание</string>
     <string name="notes">Заметки</string>
     <string name="tags">Теги</string>
+    <string name="parameters">Параметры</string>
+    <string name="completion_date">Дата завершения</string>
+    <string name="more_options">Ещё опции</string>
+    <string name="mark_as_incomplete">Отметить как незавершенную</string>
 
     <!-- Task Edit -->
     <string name="create_task">Создать задачу</string>
@@ -170,4 +174,119 @@
     <string name="no">Нет</string>
     <string name="ok">OK</string>
     <string name="confirm">Подтвердить</string>
+    <string name="delete">Удалить</string>
+    <string name="archive">Архивировать</string>
+    <string name="done">Готово</string>
+    <string name="search">Поиск</string>
+    <string name="sort">Сортировка</string>
+    <string name="filter">Фильтр</string>
+    <string name="reset_filters">Сбросить фильтры</string>
+
+    <!-- Общие действия -->
+    <string name="edit">Редактировать</string>
+    <string name="clear">Очистить</string>
+    <string name="create">Создать</string>
+    <string name="navigate_back">Назад</string>
+
+    <!-- Экран задач -->
+    <string name="all">Все</string>
+    <string name="no_tasks_found">Задачи не найдены</string>
+    <string name="mark_complete">Отметить как выполненное</string>
+    <string name="mark_incomplete">Отметить как невыполненное</string>
+    <string name="today">Сегодня</string>
+    <string name="tomorrow">Завтра</string>
+    <string name="yesterday">Вчера</string>
+    <string name="collapse">Свернуть</string>
+    <string name="expand">Развернуть</string>
+    <string name="filter_tasks">Фильтр задач</string>
+    <string name="sort_by">Сортировать по</string>
+    <string name="due_date_asc">Дата (↑)</string>
+    <string name="due_date_desc">Дата (↓)</string>
+    <string name="priority_high_to_low">Приоритет (высокий → низкий)</string>
+    <string name="priority_low_to_high">Приоритет (низкий → высокий)</string>
+    <string name="alphabetical">По алфавиту</string>
+    <string name="creation_date">Дата создания</string>
+    <string name="status">Статус</string>
+    <string name="active">Активные</string>
+    <string name="completed">Выполненные</string>
+    <string name="archived">Архивные</string>
+    <string name="high">Высокий</string>
+    <string name="medium">Средний</string>
+    <string name="low">Низкий</string>
+    <string name="no_due_date">Без даты</string>
+    <string name="important_urgent">Важно и срочно</string>
+    <string name="important_not_urgent">Важно, но не срочно</string>
+    <string name="not_important_urgent">Не важно, но срочно</string>
+    <string name="not_important_not_urgent">Не важно и не срочно</string>
+    <string name="unassigned_tasks">Задачи без квадранта</string>
+
+    <!-- Экран редактирования задачи -->
+    <string name="save_task">Сохранить задачу</string>
+    <string name="title">Заголовок</string>
+    <string name="date_and_time">Дата и время</string>
+    <string name="no_category">Без категории</string>
+    <string name="new_category">Новая категория</string>
+    <string name="category_name">Название категории</string>
+    <string name="no_tags">Нет тегов</string>
+    <string name="new_tag">Новый тег</string>
+    <string name="tag_name">Название тега</string>
+    <string name="color">Цвет</string>
+    <string name="no_color">Без цвета</string>
+    <string name="select_color">Выберите цвет</string>
+    <string name="select_emoji">Выберите emoji</string>
+    <string name="no_subtasks">Нет подзадач</string>
+    <string name="subtask_title">Название подзадачи</string>
+    <string name="additional_settings">Дополнительные настройки</string>
+    <string name="select_quadrant">Выберите квадрант</string>
+    <string name="no_quadrant">Не классифицировать</string>
+    <string name="pomodoro_sessions">Сеансы Pomodoro</string>
+    <string name="pomodoro_sessions_desc">Укажите количество сеансов Pomodoro для этой задачи</string>
+    <string name="number_of_sessions">Количество сеансов</string>
+    <string name="pomodoro_sessions_count">%d сеансов</string>
+    <string name="recurrence">Повторение</string>
+    <string name="recurring_task">Повторяющаяся задача</string>
+    <string name="recurrence_type">Тип повторения</string>
+    <string name="select_days">Выберите дни недели</string>
+    <string name="monday">Понедельник</string>
+    <string name="tuesday">Вторник</string>
+    <string name="wednesday">Среда</string>
+    <string name="thursday">Четверг</string>
+    <string name="friday">Пятница</string>
+    <string name="saturday">Суббота</string>
+    <string name="sunday">Воскресенье</string>
+    <string name="day_of_month">День месяца</string>
+    <string name="day">День</string>
+    <string name="day_of_month_note">Если день не существует в месяце, будет выбран последний день месяца</string>
+    <string name="repeat_every">Повторять каждые</string>
+    <string name="days">дней</string>
+    <string name="remove_recurrence">Удалить повторение</string>
+
+    <!-- Краткие названия дней недели -->
+    <string name="monday_short">Пн</string>
+    <string name="tuesday_short">Вт</string>
+    <string name="wednesday_short">Ср</string>
+    <string name="thursday_short">Чт</string>
+    <string name="friday_short">Пт</string>
+    <string name="saturday_short">Сб</string>
+    <string name="sunday_short">Вс</string>
+
+    <!-- Pomodoro -->
+    <string name="estimated_sessions">Запланировано сессий</string>
+    <string name="total_focus_time">Общее время фокуса</string>
+    <string name="start_session">Начать</string>
+
+    <!-- Диалоги -->
+    <string name="delete_task_confirmation">Вы уверены, что хотите удалить эту задачу? Это действие нельзя будет отменить.</string>
+
+    <!-- Часы и время -->
+    <string name="hours_short">ч</string>
+    <string name="minutes_short">мин</string>
+    <string name="time_format">%1$d %2$s %3$d %4$s</string>
+    <string name="time_format_minutes_only">%1$d %2$s</string>
+
+    <!-- Дополнительные строки для экрана деталей задачи -->
+    <string name="weekly_on">Еженедельно по %1$s</string>
+    <string name="monthly_on_day">Ежемесячно в %1$d день</string>
+    <string name="every_n_days">Каждые %1$d дн.</string>
+    <string name="yearly">Ежегодно</string>
 </resources>

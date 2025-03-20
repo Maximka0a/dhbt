@@ -1,66 +1,91 @@
 package com.example.dhbt.presentation.navigation
 
-import androidx.compose.material.BottomNavigation
-import androidx.compose.material.BottomNavigationItem
-import androidx.compose.material.Icon
-import androidx.compose.material.Text
+import android.util.Log
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.dhbt.R
 
-//sealed class BottomNavItem(val route: String, val iconResId: Int, val labelResId: Int) {
-//    object Dashboard : BottomNavItem("Dashboard", R.drawable.ic_dashboard, R.string.dashboard)
-//    object Tasks : BottomNavItem("Tasks", R.drawable.ic_tasks, R.string.tasks)
-//    object Habits : BottomNavItem("Habits", R.drawable.ic_habits, R.string.habits)
-//    object Statistics : BottomNavItem("Statistics", R.drawable.ic_statistics, R.string.statistics)
-//    object More : BottomNavItem("More", R.drawable.ic_more, R.string.more)
-//}
-
-sealed class BottomNavItem(val route: String, val iconResId: Int, val labelResId: Int) {
-    object Dashboard : BottomNavItem("Dashboard", R.drawable.ic_launcher_foreground, R.string.dashboard)
-    object Tasks : BottomNavItem("Tasks", R.drawable.ic_launcher_foreground, R.string.tasks)
-    object Habits : BottomNavItem("Habits", R.drawable.ic_launcher_foreground, R.string.habits)
-    object Statistics : BottomNavItem("Statistics", R.drawable.ic_launcher_foreground, R.string.statistics)
-    object More : BottomNavItem("More", R.drawable.ic_launcher_foreground, R.string.more)
-}
-
+/**
+ * Компонент нижней навигации приложения
+ */
 @Composable
 fun DHbtBottomNavigation(navController: NavController) {
     val items = listOf(
-        BottomNavItem.Dashboard,
-        BottomNavItem.Tasks,
-        BottomNavItem.Habits,
-        BottomNavItem.Statistics,
-        BottomNavItem.More
+        NavItem(
+            route = Dashboard,
+            iconResId = R.drawable.ic_launcher_foreground,
+            titleResId = R.string.dashboard
+        ),
+        NavItem(
+            route = Tasks,
+            iconResId = R.drawable.ic_launcher_foreground,
+            titleResId = R.string.tasks
+        ),
+        NavItem(
+            route = Habits,
+            iconResId = R.drawable.ic_launcher_foreground,
+            titleResId = R.string.habits
+        ),
+        NavItem(
+            route = Statistics,
+            iconResId = R.drawable.ic_launcher_foreground,
+            titleResId = R.string.statistics
+        ),
+        NavItem(
+            route = More,
+            iconResId = R.drawable.ic_launcher_foreground,
+            titleResId = R.string.more
+        )
     )
 
-    BottomNavigation {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
 
+    NavigationBar {
         items.forEach { item ->
-            BottomNavigationItem(
-                icon = { Icon(painter = painterResource(id = item.iconResId), contentDescription = null) },
-                label = { Text(text = stringResource(id = item.labelResId)) },
-                selected = currentRoute == item.route,
+            val isSelected = currentDestination?.route?.contains(item.route::class.qualifiedName ?: "") == true
+
+            NavigationBarItem(
+                icon = {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = item.iconResId),
+                        contentDescription = stringResource(id = item.titleResId)
+                    )
+                },
+                label = { Text(stringResource(id = item.titleResId)) },
+                selected = isSelected,
                 onClick = {
-                    navController.navigate(item.route) {
-                        // Избегаем создания несколько копий одного назначения в стеке
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                    if (!isSelected) {
+                        Log.d("Navigation", "Navigating to: ${item.route::class.qualifiedName}")
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        // Избегаем повторного создания одного и того же назначения
-                        launchSingleTop = true
-                        // Сохраняем состояние при навигации
-                        restoreState = true
                     }
                 }
             )
         }
     }
 }
+
+/**
+ * Элемент навигации
+ */
+data class NavItem(
+    val route: Any,
+    val iconResId: Int,
+    val titleResId: Int
+)

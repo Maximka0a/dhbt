@@ -17,7 +17,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.dhbt.domain.model.AppTheme
-import com.example.dhbt.presentation.dashboard.DashboardScreen
 import com.example.dhbt.presentation.navigation.DHbtBottomNavigation
 import com.example.dhbt.presentation.navigation.DHbtNavHost
 import com.example.dhbt.presentation.navigation.Dashboard
@@ -31,29 +30,16 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Настройка полноэкранного режима без вырезов
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // Установка и настройка сплэш-экрана
         installSplashScreen().apply {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
-
         setContent {
-            DashboardScreen(
-                onTaskClick = {},
-                onHabitClick = {},
-                onAddTask = {},
-                onAddHabit = {},
-                onViewAllTasks = {},
-                onViewAllHabits = {},
-            )
+            DHbtApp()
         }
     }
 }
@@ -68,27 +54,31 @@ fun DHbtApp() {
         AppTheme.DARK -> true
         AppTheme.SYSTEM -> isSystemInDarkTheme()
     }) {
+        // Выбираем начальный экран на основе состояния
         val startDestination = if (uiState.hasCompletedOnboarding) {
-            Dashboard.javaClass.simpleName
+            Dashboard
         } else {
-            Onboarding.javaClass.simpleName
+            Onboarding
         }
 
         val navController = rememberNavController()
 
         Scaffold(
             bottomBar = {
-                // Отображаем нижнюю панель навигации только на основных экранах
                 val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+                // Список экранов, на которых отображается нижняя панель навигации
                 val mainRoutes = listOf(
-                    Dashboard.javaClass.simpleName,
-                    Tasks.javaClass.simpleName,
-                    Habits.javaClass.simpleName,
-                    Statistics.javaClass.simpleName,
-                    More.javaClass.simpleName
+                    Dashboard::class.qualifiedName,
+                    Tasks::class.qualifiedName,
+                    Habits::class.qualifiedName,
+                    Statistics::class.qualifiedName,
+                    More::class.qualifiedName
                 )
 
-                if (currentRoute in mainRoutes) {
+                val showBottomNav = currentRoute in mainRoutes
+
+                if (showBottomNav) {
                     DHbtBottomNavigation(navController)
                 }
             }

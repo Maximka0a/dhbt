@@ -3,31 +3,29 @@ package com.example.dhbt.presentation.util
 import androidx.compose.ui.graphics.Color
 
 /**
- * Преобразует строковое представление цвета в объект Color
- * Поддерживает форматы:
- * - "#RRGGBB"
- * - "#AARRGGBB"
+ * Преобразует строку с HEX кодом цвета в объект Color
+ * @param defaultColor цвет по умолчанию, если преобразование не удалось
  */
 fun String?.toColor(defaultColor: Color = Color.Gray): Color {
-    if (this == null || this.isEmpty()) return defaultColor
+    if (this == null) return defaultColor
 
     return try {
-        when {
-            startsWith("#") && length == 7 -> {
-                Color(
-                    red = substring(1, 3).toInt(16) / 255f,
-                    green = substring(3, 5).toInt(16) / 255f,
-                    blue = substring(5, 7).toInt(16) / 255f
-                )
-            }
-            startsWith("#") && length == 9 -> {
-                Color(
-                    alpha = substring(1, 3).toInt(16) / 255f,
-                    red = substring(3, 5).toInt(16) / 255f,
-                    green = substring(5, 7).toInt(16) / 255f,
-                    blue = substring(7, 9).toInt(16) / 255f
-                )
-            }
+        val colorString = this.trim()
+            .removePrefix("#")
+            .padStart(6, '0')
+
+        when (colorString.length) {
+            6 -> Color(
+                red = colorString.substring(0, 2).toInt(16) / 255f,
+                green = colorString.substring(2, 4).toInt(16) / 255f,
+                blue = colorString.substring(4, 6).toInt(16) / 255f
+            )
+            8 -> Color(
+                red = colorString.substring(0, 2).toInt(16) / 255f,
+                green = colorString.substring(2, 4).toInt(16) / 255f,
+                blue = colorString.substring(4, 6).toInt(16) / 255f,
+                alpha = colorString.substring(6, 8).toInt(16) / 255f
+            )
             else -> defaultColor
         }
     } catch (e: Exception) {
