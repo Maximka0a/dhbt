@@ -153,11 +153,6 @@ fun DashboardScreen(
                         )
                     }
                 }
-
-                // Дополнительное пространство внизу
-                item {
-                    Spacer(modifier = Modifier.height(80.dp))
-                }
             }
         }
     }

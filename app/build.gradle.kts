@@ -43,8 +43,9 @@ android {
 }
 
 dependencies {
-    implementation("com.kizitonwose.calendar:compose:2.4.1")
-    implementation("me.saket.swipe:swipe:1.2.0")
+    implementation(libs.compose)
+    implementation(libs.swipe)
+    implementation(libs.timber)
     // Date & Time
     implementation(libs.threetenabp)
     implementation(libs.androidx.preference.ktx)
