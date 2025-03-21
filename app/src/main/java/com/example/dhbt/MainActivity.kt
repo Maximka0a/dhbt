@@ -25,6 +25,7 @@ import com.example.dhbt.presentation.navigation.More
 import com.example.dhbt.presentation.navigation.Onboarding
 import com.example.dhbt.presentation.navigation.Statistics
 import com.example.dhbt.presentation.navigation.Tasks
+import com.example.dhbt.presentation.task.edit.EditTaskScreen
 import com.example.dhbt.presentation.theme.DHbtTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -39,7 +40,9 @@ class MainActivity : ComponentActivity() {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
         setContent {
-            DHbtApp()
+            EditTaskScreen(
+                navController = rememberNavController()
+            )
         }
     }
 }

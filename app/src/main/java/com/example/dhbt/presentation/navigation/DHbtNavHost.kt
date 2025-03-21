@@ -88,7 +88,7 @@ fun DHbtNavHost(
         composable<TaskEdit> { backStackEntry ->
             val taskData = backStackEntry.toRoute<TaskEdit>()
             TaskEditScreen(
-                taskId = taskData.taskId,
+                taskId =  taskData.taskId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
