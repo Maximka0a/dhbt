@@ -333,4 +333,22 @@
     <string name="uncategorized">Без категории</string>
     <string name="clear_filters">Сбросить фильтры</string>
 
+
+
+    <!-- Habits Screen -->
+    <string name="view_mode">Режим просмотра</string>
+    <string name="view_list_description">Подробный список с кнопками действий</string>
+    <string name="view_grid_description">Компактная сетка привычек</string>
+    <string name="view_categories_description">Сгруппировано по категориям</string>
+    <string name="all_completed">Все выполнено</string>
+    <string name="partially_completed">Частично выполнено</string>
+    <string name="started">Начато</string>
+    <string name="not_completed">Не выполнено</string>
+    <string name="minutes">мин</string>
+    <string name="increase">Увеличить</string>
+    <string name="decrease">Уменьшить</string>>
+    <string name="details">Подробности</string>
+    <string name="more_actions">Ещё действия</string>
+    <string name="previous_week">Предыдущая неделя</string>
+    <string name="next_week">Следующая неделя</string>
 </resources>

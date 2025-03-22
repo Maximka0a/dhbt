@@ -1,32 +1,26 @@
-@file:OptIn(ExperimentalMaterialApi::class)
-
 package com.example.dhbt.presentation.habit.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.rememberSwipeableState
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,7 +31,7 @@ import com.example.dhbt.R
 import com.example.dhbt.domain.model.HabitType
 import com.example.dhbt.presentation.habit.list.HabitWithProgress
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun HabitListItem(
     habitWithProgress: HabitWithProgress,
@@ -53,38 +47,57 @@ fun HabitListItem(
     val progress = habitWithProgress.currentProgress
     val isCompleted = habitWithProgress.isCompletedToday
 
-    // Анимация прогресса
+    // Анимация прогресса с пружинным эффектом
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = 500),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
         label = "progress"
     )
 
-    var swipeableState = rememberSwipeableState(initialValue = 0)
 
-    // Получаем цвет привычки вне блоков try-catch
-    val backgroundColor = getHabitColor(habit.color, MaterialTheme.colorScheme.surfaceVariant)
+    // Получаем цвет привычки
+    val habitColor = getHabitColor(habit.color, MaterialTheme.colorScheme.primary)
 
+    // Определяем цвет фона для карточки
+    val cardColor = if (isCompleted) {
+        MaterialTheme.colorScheme.surfaceContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    // Определяем цвет для полосы прогресса
+    val progressColor = if (isCompleted) {
+        habitColor
+    } else {
+        MaterialTheme.colorScheme.secondary
+    }
+
+    // Определяем цвет для серии
     val streakColor = when {
-        habit.currentStreak >= 30 -> MaterialTheme.colorScheme.primary
+        habit.currentStreak >= 30 -> MaterialTheme.colorScheme.tertiary
         habit.currentStreak >= 14 -> MaterialTheme.colorScheme.secondary
-        habit.currentStreak >= 7 -> MaterialTheme.colorScheme.tertiary
+        habit.currentStreak >= 7 -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.outline
     }
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isCompleted) 4.dp else 1.dp,
+            pressedElevation = 8.dp
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(12.dp)
+                .padding(16.dp)
         ) {
             // Верхняя часть: Эмодзи, название и серия
             Row(
@@ -95,30 +108,71 @@ fun HabitListItem(
                 // Эмодзи/иконка привычки в кружке с цветом привычки
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
+                        .shadow(elevation = 4.dp, shape = CircleShape)
                         .clip(CircleShape)
-                        .background(backgroundColor)
+                        .background(habitColor)
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = habit.iconEmoji ?: "📌",
-                        fontSize = 18.sp,
+                        fontSize = 22.sp,
                         textAlign = TextAlign.Center
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                // Название привычки
-                Text(
-                    text = habit.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // Название привычки с индикатором типа
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = habit.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        // Тип привычки
+                        val typeIcon = when (habit.type) {
+                            HabitType.BINARY -> Icons.Default.Check
+                            HabitType.QUANTITY -> Icons.Default.Numbers
+                            HabitType.TIME -> Icons.Default.Timer
+                        }
+
+                        val typeColor = when (habit.type) {
+                            HabitType.BINARY -> MaterialTheme.colorScheme.primary
+                            HabitType.QUANTITY -> MaterialTheme.colorScheme.secondary
+                            HabitType.TIME -> MaterialTheme.colorScheme.tertiary
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Icon(
+                            imageVector = typeIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = typeColor
+                        )
+                    }
+
+                    // Описание привычки (если есть)
+                    if (!habit.description.isNullOrBlank()) {
+                        Text(
+                            text = habit.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
@@ -131,12 +185,11 @@ fun HabitListItem(
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        // Заменим LocalFire на другую подходящую иконку
                         Icon(
                             imageVector = Icons.Default.Whatshot,
                             contentDescription = null,
                             tint = streakColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
 
                         Spacer(modifier = Modifier.width(4.dp))
@@ -144,27 +197,48 @@ fun HabitListItem(
                         Text(
                             text = habit.currentStreak.toString(),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = streakColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Индикатор прогресса
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = if (isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            // Индикатор прогресса с пульсирующим эффектом
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // Фоновая полоса
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                // Полоса прогресса
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(progressColor)
+                )
+
+                // Пульсирующая точка на конце прогрессбара для незавершенных задач
+                if (!isCompleted && animatedProgress > 0.05f) {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = (animatedProgress * 100).coerceIn(0f, 100f).dp - 6.dp)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(progressColor)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Нижняя часть: Прогресс и кнопки управления
             Row(
@@ -174,7 +248,10 @@ fun HabitListItem(
             ) {
                 // Отображение прогресса в зависимости от типа привычки
                 val progressText = when (habit.type) {
-                    HabitType.BINARY -> if (isCompleted) "Выполнено" else "Не выполнено"
+                    HabitType.BINARY -> if (isCompleted)
+                        stringResource(R.string.completed)
+                    else
+                        stringResource(R.string.not_completed)
                     HabitType.QUANTITY -> {
                         val currentValue = habitWithProgress.todayTracking?.value ?: 0f
                         val targetValue = habit.targetValue ?: 1f
@@ -183,31 +260,49 @@ fun HabitListItem(
                     HabitType.TIME -> {
                         val currentDuration = habitWithProgress.todayTracking?.duration ?: 0
                         val targetDuration = habit.targetValue?.toInt() ?: 0
-                        "$currentDuration/${targetDuration} мин"
+                        "$currentDuration/${targetDuration} ${stringResource(R.string.minutes)}"
                     }
                 }
 
-                Text(
-                    text = progressText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
+                AnimatedContent(
+                    targetState = progressText,
+                    transitionSpec = {
+                        slideInVertically { height -> height } + fadeIn() with
+                                slideOutVertically { height -> -height } + fadeOut()
+                    }
+                ) { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isCompleted)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
                 // Кнопки управления прогрессом
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     // Для количественных и временных привычек показываем кнопки + и -
                     if (habit.type != HabitType.BINARY) {
-                        IconButton(
+                        // Кнопка уменьшения прогресса
+                        FilledTonalIconButton(
                             onClick = onDecrement,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Remove,
-                                contentDescription = "Уменьшить",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                contentDescription = stringResource(R.string.decrease),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -220,18 +315,24 @@ fun HabitListItem(
                             checked = isCompleted,
                             onCheckedChange = { onToggleCompletion() },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = MaterialTheme.colorScheme.primary
+                                checkedColor = habitColor,
+                                checkmarkColor = Color.White
                             )
                         )
                     } else {
-                        IconButton(
+                        // Кнопка увеличения прогресса
+                        FilledIconButton(
                             onClick = onIncrement,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = habitColor,
+                                contentColor = Color.White
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Add,
-                                contentDescription = "Увеличить",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                contentDescription = stringResource(R.string.increase),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -240,17 +341,40 @@ fun HabitListItem(
                     var expanded by remember { mutableStateOf(false) }
 
                     Box {
-                        IconButton(onClick = { expanded = true }) {
+                        IconButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Ещё"
+                                contentDescription = stringResource(R.string.more_actions)
                             )
                         }
 
                         DropdownMenu(
                             expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier
+                                .width(220.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    RoundedCornerShape(16.dp)
+                                )
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.details)) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    expanded = false
+                                    onClick()
+                                }
+                            )
+
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.edit)) },
                                 leadingIcon = {
@@ -265,12 +389,22 @@ fun HabitListItem(
                                 }
                             )
 
+                            Divider(
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.archive)) },
+                                text = {
+                                    Text(
+                                        stringResource(R.string.archive),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Outlined.Archive,
-                                        contentDescription = null
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 },
                                 onClick = {
@@ -301,54 +435,99 @@ fun HabitGridItem(
     // Анимация прогресса
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = 500),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
         label = "progress"
     )
 
-    // Получаем цвет привычки вне блоков try-catch
-    val backgroundColor = getHabitColor(habit.color, MaterialTheme.colorScheme.surfaceVariant)
+    // Получаем цвет привычки
+    val backgroundColor = getHabitColor(habit.color, MaterialTheme.colorScheme.primary)
+    val containerColor = if (isCompleted) {
+        MaterialTheme.colorScheme.surfaceContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
 
     Card(
         modifier = modifier
-            .height(120.dp)
-            .aspectRatio(1f)
-            .padding(4.dp),
-        shape = RoundedCornerShape(16.dp),
+            .height(160.dp)
+            .aspectRatio(0.85f),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = containerColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isCompleted) 4.dp else 1.dp,
+            pressedElevation = 8.dp
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(onClick = onClick)
-                .padding(8.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Эмодзи/иконка привычки
+            // Эмодзи/иконка привычки с индикатором серии
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(backgroundColor)
-                    .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = habit.iconEmoji ?: "📌",
-                    fontSize = 20.sp,
-                    textAlign = TextAlign.Center
-                )
+                // Основной значок привычки
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .shadow(elevation = 4.dp, shape = CircleShape)
+                        .clip(CircleShape)
+                        .background(backgroundColor)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = habit.iconEmoji ?: "📌",
+                        fontSize = 24.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // Бейдж серии, если > 0
+                if (habit.currentStreak > 0) {
+                    val streakColor = when {
+                        habit.currentStreak >= 30 -> MaterialTheme.colorScheme.tertiary
+                        habit.currentStreak >= 14 -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 8.dp, y = (-4).dp)
+                            .size(24.dp)
+                            .shadow(elevation = 2.dp, shape = CircleShape)
+                            .clip(CircleShape)
+                            .background(streakColor)
+                            .padding(2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = habit.currentStreak.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
 
             // Название привычки
             Text(
                 text = habit.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -356,8 +535,8 @@ fun HabitGridItem(
             // Прогресс
             Box(
                 modifier = Modifier
-                    .padding(top = 4.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 when (habit.type) {
@@ -367,34 +546,35 @@ fun HabitGridItem(
                             checked = isCompleted,
                             onCheckedChange = { onToggleCompletion() },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = MaterialTheme.colorScheme.primary
+                                checkedColor = backgroundColor,
+                                checkmarkColor = Color.White
                             ),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                     else -> {
                         // Круговой прогресс для количественных и временных привычек
                         Box(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(44.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
                                 progress = { animatedProgress },
                                 modifier = Modifier.fillMaxSize(),
-                                color = if (isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                                strokeWidth = 3.dp,
+                                color = if (isCompleted) backgroundColor else MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                strokeWidth = 4.dp,
                                 strokeCap = StrokeCap.Round
                             )
 
                             IconButton(
                                 onClick = onIncrement,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.matchParentSize()
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
-                                    contentDescription = "Увеличить",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(16.dp)
+                                    contentDescription = stringResource(R.string.increase),
+                                    tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

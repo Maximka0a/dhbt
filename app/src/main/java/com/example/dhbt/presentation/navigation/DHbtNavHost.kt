@@ -15,6 +15,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.example.dhbt.presentation.MainViewModel
 import com.example.dhbt.presentation.dashboard.DashboardScreen
+import com.example.dhbt.presentation.habit.detail.HabitDetailScreen
+import com.example.dhbt.presentation.habit.edit.EditHabitScreen
+import com.example.dhbt.presentation.habit.list.HabitsScreen
 import com.example.dhbt.presentation.pomodoro.PomodoroScreen
 import com.example.dhbt.presentation.task.detail.TaskDetailScreen
 import com.example.dhbt.presentation.task.edit.EditTaskScreen
@@ -25,7 +28,7 @@ fun DHbtNavHost(
     navController: NavHostController,
     startDestination: Any = Dashboard,
     modifier: Modifier = Modifier,
-    mainViewModel: MainViewModel? = null  // Добавляем опциональный параметр
+    mainViewModel: MainViewModel? = null
 ) {
     NavHost(
         navController = navController, startDestination = startDestination, modifier = modifier
@@ -49,23 +52,9 @@ fun DHbtNavHost(
                     }
                 }
             }
-            /*
-            OnboardingScreen(
-                onComplete = {
-                    mainViewModel?.completeOnboarding()  // Вызываем метод для завершения онбординга
-                    navController.navigate(Dashboard) {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                    }
-                },
-                onUpdateUserName = { name -> mainViewModel?.updateUserName(name) },
-                onUpdateWakeupAndSleepTime = { wakeUp, sleep ->
-                    mainViewModel?.updateWakeupAndSleepTime(wakeUp, sleep)
-                }
-            )
-             */
         }
 
-        // Переместили маршрут TaskDetail на уровень других маршрутов
+        // Экраны задач
         composable<TaskDetail> { backStackEntry ->
             val taskData = backStackEntry.toRoute<TaskDetail>()
             TaskDetailScreen(
@@ -77,17 +66,52 @@ fun DHbtNavHost(
 
         composable<TaskEdit> { backStackEntry ->
             val taskData = backStackEntry.toRoute<TaskEdit>()
-
             EditTaskScreen(
-                taskId = taskData.taskId, // Передаем taskId в компонент
+                taskId = taskData.taskId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+
+        // Экраны привычек
+        composable<HabitDetail> { backStackEntry ->
+            val habitData = backStackEntry.toRoute<HabitDetail>()
+            // Здесь можно добавить экран деталей привычки, когда он будет реализован
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Детали привычки ${habitData.habitId}")
+                    Button(onClick = {
+                        navController.navigate(HabitEdit(habitData.habitId))
+                    }) {
+                        Text("Редактировать")
+                    }
+                    Button(onClick = {
+                        navController.popBackStack()
+                    }) {
+                        Text("Назад")
+                    }
+                }
+            }
+        }
+
+        composable<HabitEdit> { backStackEntry ->
+            val habitData = backStackEntry.toRoute<HabitEdit>()
+            EditHabitScreen(
+                navController = navController
+            )
+        }
+
+        // Экран Pomodoro
         composable<Pomodoro> {
             PomodoroScreen(
                 navController = navController
             )
         }
+
+        // Основные экраны навигации
         composable<Dashboard> {
             DashboardScreen(
                 onTaskClick = { taskId -> navController.navigate(TaskDetail(taskId)) },
@@ -99,15 +123,29 @@ fun DHbtNavHost(
             )
         }
 
-
         composable<Tasks> {
-            TasksScreen(onTaskClick = { taskId ->
-                navController.navigate(TaskDetail(taskId))
-            }, onAddTask = {
-                navController.navigate(TaskEdit())
-            })
+            TasksScreen(
+                onTaskClick = { taskId ->
+                    navController.navigate(TaskDetail(taskId))
+                },
+                onAddTask = {
+                    navController.navigate(TaskEdit())
+                }
+            )
+        }
+        composable<HabitDetail> { backStackEntry ->
+            val habitData = backStackEntry.toRoute<HabitDetail>()
+            HabitDetailScreen(
+                navController = navController
+            )
         }
 
-        // Остальные маршруты (закомментированные)...
+        composable<Habits> {
+            HabitsScreen(
+                navController = navController
+            )
+        }
+
+        // Остальные маршруты...
     }
 }
