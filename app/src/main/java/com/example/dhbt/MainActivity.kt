@@ -40,7 +40,9 @@ class MainActivity : ComponentActivity() {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
         setContent {
-            DHbtApp()
+            EditTaskScreen(
+                navController = rememberNavController()
+            )
         }
     }
 }
