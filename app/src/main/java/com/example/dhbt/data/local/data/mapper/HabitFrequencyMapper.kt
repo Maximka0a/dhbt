@@ -13,7 +13,18 @@ class HabitFrequencyMapper @Inject constructor() {
 
     fun mapFromEntity(entity: HabitFrequencyEntity): HabitFrequency {
         val daysOfWeek = entity.daysOfWeek?.let { daysJson ->
-            Json.decodeFromString<List<Int>>(daysJson)
+            try {
+                // First try normal JSON parsing
+                Json.decodeFromString<List<Int>>(daysJson)
+            } catch (e: Exception) {
+                // If that fails, try parsing as comma-separated values
+                try {
+                    daysJson.split(",").map { it.trim().toInt() }
+                } catch (e2: Exception) {
+                    // If all parsing fails, return null
+                    null
+                }
+            }
         }
 
         return HabitFrequency(
@@ -28,6 +39,7 @@ class HabitFrequencyMapper @Inject constructor() {
 
     fun mapToEntity(domain: HabitFrequency): HabitFrequencyEntity {
         val daysOfWeekJson = domain.daysOfWeek?.let { days ->
+            // Always ensure proper JSON array format
             Json.encodeToString(days)
         }
 

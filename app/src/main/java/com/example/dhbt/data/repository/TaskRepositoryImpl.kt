@@ -21,9 +21,11 @@ import com.example.dhbt.domain.model.TaskStatus
 import com.example.dhbt.domain.repository.TagRepository
 import com.example.dhbt.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.forEach
 import kotlinx.coroutines.flow.map
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
+import java.util.UUID
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
@@ -45,6 +47,126 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateTaskStatus(taskId: String, status: TaskStatus) {
+        // Получаем задачу
+        val task = taskDao.getTaskById(taskId)
+
+        // Если задача найдена, обновляем статус
+        task?.let {
+            // Обновляем статус задачи
+            taskDao.updateTaskStatus(taskId, status.value)
+
+            // Если задача помечена как выполненная, устанавливаем время выполнения
+            if (status == TaskStatus.COMPLETED) {
+                val completionTime = System.currentTimeMillis()
+                taskDao.updateTaskCompletion(taskId, completionTime)
+            } else if (status == TaskStatus.ACTIVE) {
+                // Если задача возвращена в активное состояние, сбрасываем дату выполнения
+                taskDao.updateTaskCompletion(taskId, null)
+            }
+
+            // Обработка повторяющихся задач при завершении
+            if (status == TaskStatus.COMPLETED) {
+                handleRecurringTask(taskId)
+            }
+        }
+    }
+
+    // Вспомогательный метод для обработки повторяющихся задач
+    private suspend fun handleRecurringTask(taskId: String) {
+        // Получаем информацию о повторении задачи
+        val recurrence = taskRecurrenceDao.getRecurrenceForTask(taskId)
+        recurrence?.let {
+            val task = taskDao.getTaskById(taskId) ?: return
+
+            // Создаем новую задачу в зависимости от типа повторения
+            val nextDueDate = calculateNextDueDate(
+                task.dueDate ?: System.currentTimeMillis(),
+                recurrence.recurrenceType,
+                recurrence.daysOfWeek,
+                recurrence.monthDay,
+                recurrence.customInterval
+            )
+
+            // Создаем копию задачи с обновленной датой
+            val newTask = task.copy(
+                taskId = UUID.randomUUID().toString(),
+                status = 0, // 0 = ACTIVE
+                completionDate = null,
+                dueDate = nextDueDate
+            )
+
+            // Сохраняем новую задачу
+            val newTaskId = newTask.taskId
+            taskDao.insertTask(newTask)
+
+            // Копируем подзадачи - используем список вместо Flow
+            val subtasks = subtaskDao.getSubtasksForTaskSync(taskId)
+            subtasks.forEach { subtaskEntity ->
+                val newSubtask = subtaskEntity.copy(
+                    subtaskId = UUID.randomUUID().toString(),
+                    taskId = newTaskId,
+                    isCompleted = false,
+                    completionDate = null
+                )
+                subtaskDao.insertSubtask(newSubtask)
+            }
+
+            // Копируем связи с тегами - используем список вместо Flow
+            val tagRefs = taskTagDao.getTaskTagCrossRefsForTask(taskId)
+            tagRefs.forEach { ref ->
+                taskTagDao.insertTaskTagCrossRef(TaskTagCrossRef(newTaskId, ref.tagId))
+            }
+
+            // Сохраняем правило повторения для новой задачи
+            val newRecurrence = recurrence.copy(
+                recurrenceId = UUID.randomUUID().toString(),
+                taskId = newTaskId
+            )
+            taskRecurrenceDao.insertTaskRecurrence(newRecurrence)
+        }
+    }
+
+
+    private fun calculateNextDueDate(
+        currentDueDate: Long,
+        recurrenceType: Int,
+        daysOfWeekString: String?,
+        monthDay: Int?,
+        customInterval: Int?
+    ): Long {
+        val currentDate = LocalDate.ofEpochDay(currentDueDate / (24 * 60 * 60 * 1000))
+
+        return when (recurrenceType) {
+            0 -> { // Ежедневно
+                currentDate.plusDays(1)
+                    .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            1 -> { // По дням недели
+                val daysOfWeek = daysOfWeekString?.split(",")?.map { it.toInt() } ?: listOf()
+                var nextDate = currentDate.plusDays(1)
+
+                // Ищем следующий подходящий день недели
+                while (!daysOfWeek.contains(nextDate.dayOfWeek.value)) {
+                    nextDate = nextDate.plusDays(1)
+                }
+
+                nextDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            2 -> { // Ежемесячно
+                val day = monthDay ?: currentDate.dayOfMonth
+                currentDate.plusMonths(1).withDayOfMonth(
+                    minOf(day, currentDate.plusMonths(1).lengthOfMonth())
+                ).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            3 -> { // Пользовательский интервал
+                val interval = customInterval ?: 1
+                currentDate.plusDays(interval.toLong())
+                    .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            else -> currentDueDate
+        }
+    }
     override fun getTasksByStatus(status: TaskStatus): Flow<List<Task>> {
         return taskDao.getTasksByStatus(status.value).map { taskEntities ->
             taskEntities.map { taskEntity ->

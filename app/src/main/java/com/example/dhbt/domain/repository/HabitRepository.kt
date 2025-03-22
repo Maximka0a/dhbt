@@ -13,6 +13,7 @@ interface HabitRepository {
     suspend fun updateHabit(habit: Habit)
     suspend fun deleteHabit(habitId: String)
     suspend fun changeHabitStatus(habitId: String, status: HabitStatus)
+    suspend fun incrementHabitProgress(habitId: String)
 
     // Частота привычки
     suspend fun getHabitFrequency(habitId: String): HabitFrequency?

@@ -43,7 +43,9 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.compose)
+    implementation(libs.swipe)
+    implementation(libs.timber)
     // Date & Time
     implementation(libs.threetenabp)
     implementation(libs.androidx.preference.ktx)

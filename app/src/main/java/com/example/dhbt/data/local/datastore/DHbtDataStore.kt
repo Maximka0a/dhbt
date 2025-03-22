@@ -3,13 +3,14 @@ package com.example.dhbt.data.local.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.dataStore
-import com.example.dhbt.data.local.data.model.PomodoroPreferences
-import com.example.dhbt.data.local.data.model.UserData
-import com.example.dhbt.data.local.data.model.UserPreferences
+import com.example.dhbt.domain.model.PomodoroPreferences
+import com.example.dhbt.domain.model.UserData
+import com.example.dhbt.domain.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Update to use domain models
 val Context.userDataStore: DataStore<UserData> by dataStore(
     fileName = "user_data.json",
     serializer = UserDataSerializer

@@ -1,5 +1,8 @@
 package com.example.dhbt.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class UserPreferences(
     val startScreenType: StartScreen = StartScreen.DASHBOARD,
     val defaultTaskView: TaskView = TaskView.LIST,
@@ -22,7 +25,7 @@ data class UserPreferences(
 
     val hasCompletedOnboarding: Boolean = false
 )
-
+@Serializable
 enum class StartScreen(val value: Int) {
     DASHBOARD(0),
     TASKS(1),
@@ -32,7 +35,7 @@ enum class StartScreen(val value: Int) {
         fun fromInt(value: Int): StartScreen = values().firstOrNull { it.value == value } ?: DASHBOARD
     }
 }
-
+@Serializable
 enum class TaskView(val value: Int) {
     LIST(0),
     KANBAN(1),
@@ -42,7 +45,7 @@ enum class TaskView(val value: Int) {
         fun fromInt(value: Int): TaskView = values().firstOrNull { it.value == value } ?: LIST
     }
 }
-
+@Serializable
 enum class TaskSort(val value: Int) {
     DATE(0),
     PRIORITY(1),
@@ -52,7 +55,7 @@ enum class TaskSort(val value: Int) {
         fun fromInt(value: Int): TaskSort = values().firstOrNull { it.value == value } ?: DATE
     }
 }
-
+@Serializable
 enum class HabitSort(val value: Int) {
     ALPHABETICAL(0),
     STREAK(1);
@@ -61,7 +64,7 @@ enum class HabitSort(val value: Int) {
         fun fromInt(value: Int): HabitSort = values().firstOrNull { it.value == value } ?: ALPHABETICAL
     }
 }
-
+@Serializable
 enum class AppTheme(val value: Int) {
     LIGHT(0),
     DARK(1),

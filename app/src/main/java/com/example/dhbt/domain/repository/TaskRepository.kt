@@ -18,12 +18,14 @@ interface TaskRepository {
     fun getTasksByEisenhowerQuadrant(quadrant: Int): Flow<List<Task>>
     fun getTasksWithTags(tagIds: List<String>): Flow<List<Task>>
 
+
+
     suspend fun getTaskById(taskId: String): Task?
     suspend fun addTask(task: Task): String
     suspend fun updateTask(task: Task)
     suspend fun deleteTask(taskId: String)
     suspend fun completeTask(taskId: String, completionTime: Long)
-
+    suspend fun updateTaskStatus(taskId: String, status: TaskStatus)
     // Подзадачи
     fun getSubtasksForTask(taskId: String): Flow<List<Subtask>>
     suspend fun addSubtask(subtask: Subtask): String

@@ -1,7 +1,8 @@
 package com.example.dhbt.data.local.datastore
 
 import androidx.datastore.core.Serializer
-import com.example.dhbt.data.local.data.model.UserPreferences
+import com.example.dhbt.domain.model.UserPreferences
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.InputStream
 import java.io.OutputStream
