@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.dhbt.domain.model.AppTheme
+import com.example.dhbt.presentation.habit.list.HabitsScreen
 import com.example.dhbt.presentation.navigation.DHbtBottomNavigation
 import com.example.dhbt.presentation.navigation.DHbtNavHost
 import com.example.dhbt.presentation.navigation.Dashboard
@@ -41,7 +42,9 @@ class MainActivity : ComponentActivity() {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
         setContent {
-            DHbtApp()
+            HabitsScreen(
+                navController = rememberNavController()
+            )
         }
     }
 }

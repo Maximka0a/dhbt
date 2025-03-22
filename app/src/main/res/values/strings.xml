@@ -309,4 +309,28 @@
     <string name="completed_sessions">Завершено сессий</string>
     <string name="focus_time">Время фокуса</string>
     <string name="selected_task">выбранная задача?</string>
+
+    <!-- New strings for Habits screen (add to existing strings.xml) -->
+    <string name="search_habits">Поиск привычек</string>
+    <string name="name_asc">По названию (А-Я)</string>
+    <string name="name_desc">По названию (Я-А)</string>
+    <string name="streak_asc">По серии (возр.)</string>
+    <string name="streak_desc">По серии (убыв.)</string>
+    <string name="progress_asc">По прогрессу (возр.)</string>
+    <string name="progress_desc">По прогрессу (убыв.)</string>
+    <string name="creation_asc">По дате создания (стар. → нов.)</string>
+    <string name="creation_desc">По дате создания (нов. → стар.)</string>
+    <string name="view_list">Список</string>
+    <string name="view_grid">Сетка</string>
+    <string name="view_categories">По категориям</string>
+    <string name="no_habits_yet">У вас пока нет привычек</string>
+    <string name="no_habits_found">Привычки не найдены</string>
+    <string name="no_archived_habits">У вас нет архивных привычек</string>
+    <string name="try_different_search">Попробуйте изменить параметры поиска или фильтры</string>
+    <string name="archive_habits_tip">Архивируйте привычки, чтобы они не показывались в основном списке</string>
+    <string name="create_habit_tip">Начните создавать полезные привычки для достижения своих целей</string>
+    <string name="create_first_habit">Создать первую привычку</string>
+    <string name="uncategorized">Без категории</string>
+    <string name="clear_filters">Сбросить фильтры</string>
+
 </resources>
