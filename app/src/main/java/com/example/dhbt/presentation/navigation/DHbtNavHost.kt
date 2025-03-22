@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.example.dhbt.presentation.MainViewModel
 import com.example.dhbt.presentation.dashboard.DashboardScreen
+import com.example.dhbt.presentation.pomodoro.PomodoroScreen
 import com.example.dhbt.presentation.task.detail.TaskDetailScreen
 import com.example.dhbt.presentation.task.edit.EditTaskScreen
 import com.example.dhbt.presentation.task.list.TasksScreen
@@ -82,7 +83,11 @@ fun DHbtNavHost(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-
+        composable<Pomodoro> {
+            PomodoroScreen(
+                navController = navController
+            )
+        }
         composable<Dashboard> {
             DashboardScreen(
                 onTaskClick = { taskId -> navController.navigate(TaskDetail(taskId)) },

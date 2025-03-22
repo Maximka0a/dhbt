@@ -289,4 +289,24 @@
     <string name="monthly_on_day">Ежемесячно в %1$d день</string>
     <string name="every_n_days">Каждые %1$d дн.</string>
     <string name="yearly">Ежегодно</string>
+
+
+    <string name="task_progress">Прогресс по задаче</string>
+    <string name="focus_time_progress">Время фокусировки</string>
+    <string name="no_estimated_time_sessions">Задача не имеет оценки времени или количества сессий</string>
+
+    <!-- Новые строки для Pomodoro -->
+    <string name="create_new_task_for_pomodoro">Создайте новую задачу, чтобы использовать ее с Pomodoro</string>
+    <string name="stopwatch">Секундомер</string>
+    <string name="auto_start_breaks">Автоматически начинать перерывы</string>
+    <string name="auto_start_pomodoros">Автоматически начинать работу</string>
+    <string name="sound_enabled">Звуковые уведомления</string>
+    <string name="vibration_enabled">Вибрация</string>
+    <string name="keep_screen_on">Не выключать экран</string>
+    <string name="select_task">Выбрать задачу</string>
+    <string name="select_task_for_pomodoro">Выберите задачу, над которой будете работать</string>
+    <string name="today_statistics">Статистика за сегодня</string>
+    <string name="completed_sessions">Завершено сессий</string>
+    <string name="focus_time">Время фокуса</string>
+    <string name="selected_task">выбранная задача?</string>
 </resources>

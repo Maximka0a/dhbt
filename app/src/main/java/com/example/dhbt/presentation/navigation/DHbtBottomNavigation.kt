@@ -59,7 +59,7 @@ fun DHbtBottomNavigation(navController: NavController) {
             titleResId = R.string.statistics
         ),
         NavItem(
-            route = More,
+            route = Pomodoro,
             selectedIcon = Icons.Filled.Menu,
             unselectedIcon = Icons.Outlined.Menu,
             titleResId = R.string.more
