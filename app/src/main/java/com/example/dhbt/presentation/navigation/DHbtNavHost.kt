@@ -15,12 +15,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.example.dhbt.presentation.MainViewModel
 import com.example.dhbt.presentation.dashboard.DashboardScreen
+import com.example.dhbt.presentation.eisenhower.EisenhowerScreen
 import com.example.dhbt.presentation.habit.detail.HabitDetailScreen
 import com.example.dhbt.presentation.habit.edit.EditHabitScreen
 import com.example.dhbt.presentation.habit.list.HabitsScreen
 import com.example.dhbt.presentation.pomodoro.PomodoroScreen
 import com.example.dhbt.presentation.settings.SettingsScreen
 import com.example.dhbt.presentation.statistics.StatisticsScreen
+import com.example.dhbt.presentation.subscription.SubscriptionScreen
 import com.example.dhbt.presentation.task.detail.TaskDetailScreen
 import com.example.dhbt.presentation.task.edit.EditTaskScreen
 import com.example.dhbt.presentation.task.list.TasksScreen
@@ -112,6 +114,9 @@ fun DHbtNavHost(
                 navController = navController
             )
         }
+        composable<EisenhowerMatrix> {
+            EisenhowerScreen(navController = navController)
+        }
 
         // Основные экраны навигации
         composable<Dashboard> {
@@ -122,7 +127,7 @@ fun DHbtNavHost(
                 onAddHabit = { navController.navigate(HabitEdit()) },
                 onViewAllTasks = { navController.navigate(Tasks) },
                 onViewAllHabits = { navController.navigate(Habits) },
-                onSettings = {navController.navigate(Settings)}
+                onSettings = {navController.navigate(PremiumSubscription)}
             )
         }
 
@@ -142,7 +147,9 @@ fun DHbtNavHost(
                 navController = navController
             )
         }
-
+        composable<PremiumSubscription> {
+            SubscriptionScreen(navController = navController)
+        }
         composable<Habits> {
             HabitsScreen(
                 navController = navController
