@@ -53,6 +53,7 @@ fun DashboardScreen(
     onAddHabit: () -> Unit,
     onViewAllTasks: () -> Unit,
     onViewAllHabits: () -> Unit,
+    onSettings: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -71,7 +72,8 @@ fun DashboardScreen(
         topBar = {
             DashboardTopAppBar(
                 userName = state.userData?.name ?: "Пользователь",
-                formattedDate = viewModel.getTodayFormatted()
+                formattedDate = viewModel.getTodayFormatted(),
+                onSettings = onSettings
             )
         },
         floatingActionButton = {
@@ -162,7 +164,8 @@ fun DashboardScreen(
 @Composable
 fun DashboardTopAppBar(
     userName: String,
-    formattedDate: String
+    formattedDate: String,
+    onSettings: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -179,7 +182,7 @@ fun DashboardTopAppBar(
             }
         },
         actions = {
-            IconButton(onClick = { /* Действие настроек */ }) {
+            IconButton(onClick =  onSettings ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = stringResource(R.string.settings)

@@ -1,11 +1,14 @@
 package com.example.dhbt.data.repository
 
+import com.example.dhbt.data.local.dao.CategoryDao
 import com.example.dhbt.data.local.dao.HabitDao
 import com.example.dhbt.data.local.dao.HabitTrackingDao
 import com.example.dhbt.data.local.dao.PomodoroSessionDao
 import com.example.dhbt.data.local.dao.StatisticSummaryDao
 import com.example.dhbt.data.local.dao.TaskDao
+import com.example.dhbt.data.mapper.CategoryMapper
 import com.example.dhbt.data.mapper.StatisticSummaryMapper
+import com.example.dhbt.domain.model.Category
 import com.example.dhbt.domain.model.StatisticPeriod
 import com.example.dhbt.domain.model.StatisticSummary
 import com.example.dhbt.domain.model.TaskPriority
@@ -22,16 +25,23 @@ import javax.inject.Inject
 class StatisticsRepositoryImpl @Inject constructor(
     private val statisticSummaryDao: StatisticSummaryDao,
     private val taskDao: TaskDao,
+    private val categoryDao: CategoryDao,
     private val habitDao: HabitDao,
     private val habitTrackingDao: HabitTrackingDao,
     private val pomodoroSessionDao: PomodoroSessionDao,
-    private val statisticSummaryMapper: StatisticSummaryMapper
+    private val statisticSummaryMapper: StatisticSummaryMapper,
+    private val categoryMapper: CategoryMapper
 ) : StatisticsRepository {
 
     override fun getAllStatisticSummaries(): Flow<List<StatisticSummary>> {
         return statisticSummaryDao.getAllStatisticSummaries().map { entities ->
             entities.map { statisticSummaryMapper.mapFromEntity(it) }
         }
+    }
+
+    override suspend fun getCategoryDetails(categoryId: String): Category? {
+        val categoryEntity = categoryDao.getCategoryById(categoryId) ?: return null
+        return categoryMapper.mapFromEntity(categoryEntity)
     }
 
     override fun getStatisticSummariesByPeriod(periodType: StatisticPeriod): Flow<List<StatisticSummary>> {

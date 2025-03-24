@@ -14,11 +14,11 @@ data class StatisticSummary(
     val pomodoroDistribution: Map<String, Int>? = null
 )
 
-enum class StatisticPeriod(val value: Int) {
-    DAY(0),
-    WEEK(1),
-    MONTH(2),
-    YEAR(3);
+enum class StatisticPeriod(val value: Int, val displayName: String) {
+    DAY(0, "День"),
+    WEEK(1, "Неделя"),
+    MONTH(2, "Месяц"),
+    YEAR(3, "Год");
 
     companion object {
         fun fromInt(value: Int): StatisticPeriod = values().firstOrNull { it.value == value } ?: DAY

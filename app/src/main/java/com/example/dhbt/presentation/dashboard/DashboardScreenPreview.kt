@@ -167,8 +167,9 @@ fun DashboardScreenPreviewContent(
         topBar = {
             DashboardTopAppBar(
                 userName = state.userData?.name ?: "Пользователь",
-                formattedDate = "19 марта" // Хардкодим для превью
-            )
+                formattedDate = "19 марта" ,// Хардкодим для превью,
+                onSettings = {}
+                )
         },
         floatingActionButton = {
             DashboardFab(

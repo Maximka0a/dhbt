@@ -19,6 +19,8 @@ import com.example.dhbt.presentation.habit.detail.HabitDetailScreen
 import com.example.dhbt.presentation.habit.edit.EditHabitScreen
 import com.example.dhbt.presentation.habit.list.HabitsScreen
 import com.example.dhbt.presentation.pomodoro.PomodoroScreen
+import com.example.dhbt.presentation.settings.SettingsScreen
+import com.example.dhbt.presentation.statistics.StatisticsScreen
 import com.example.dhbt.presentation.task.detail.TaskDetailScreen
 import com.example.dhbt.presentation.task.edit.EditTaskScreen
 import com.example.dhbt.presentation.task.list.TasksScreen
@@ -120,6 +122,7 @@ fun DHbtNavHost(
                 onAddHabit = { navController.navigate(HabitEdit()) },
                 onViewAllTasks = { navController.navigate(Tasks) },
                 onViewAllHabits = { navController.navigate(Habits) },
+                onSettings = {navController.navigate(Settings)}
             )
         }
 
@@ -145,7 +148,16 @@ fun DHbtNavHost(
                 navController = navController
             )
         }
-
+        composable<Settings> {
+            SettingsScreen(
+                navController = navController
+            )
+        }
+        composable<Statistics>{
+            StatisticsScreen(
+                navController = navController
+            )
+        }
         // Остальные маршруты...
     }
 }

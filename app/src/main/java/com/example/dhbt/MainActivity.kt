@@ -28,6 +28,7 @@ import com.example.dhbt.presentation.navigation.Onboarding
 import com.example.dhbt.presentation.navigation.Statistics
 import com.example.dhbt.presentation.navigation.Tasks
 import com.example.dhbt.presentation.pomodoro.PomodoroScreen
+import com.example.dhbt.presentation.statistics.StatisticsScreen
 import com.example.dhbt.presentation.task.edit.EditTaskScreen
 import com.example.dhbt.presentation.theme.DHbtTheme
 import dagger.hilt.android.AndroidEntryPoint
