@@ -80,6 +80,7 @@ import java.util.concurrent.TimeUnit
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PomodoroScreen(
+    taskId: String = "",
     navController: NavController,
     viewModel: PomodoroViewModel = hiltViewModel()
 ) {

@@ -24,6 +24,7 @@ import com.example.dhbt.domain.model.Category
 import com.example.dhbt.domain.model.CategoryType
 import com.example.dhbt.domain.model.Subtask
 import com.example.dhbt.domain.model.TaskPriority
+import com.example.dhbt.presentation.shared.ColorIndicator
 import com.example.dhbt.presentation.theme.DHbtTheme
 import java.text.SimpleDateFormat
 import java.util.*

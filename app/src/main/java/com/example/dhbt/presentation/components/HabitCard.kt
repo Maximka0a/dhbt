@@ -33,6 +33,7 @@ import com.example.dhbt.domain.model.Habit
 import com.example.dhbt.domain.model.HabitFrequency
 import com.example.dhbt.domain.model.HabitStatus
 import com.example.dhbt.domain.model.HabitType
+import com.example.dhbt.presentation.shared.EmojiIcon
 import com.example.dhbt.presentation.theme.DHbtTheme
 import com.example.dhbt.presentation.util.toColor
 
@@ -51,12 +52,7 @@ fun HabitCardBinaryPreview() {
                     creationDate = System.currentTimeMillis(),
                     type = HabitType.BINARY,
                     currentStreak = 3,
-                    bestStreak = 7,
-                    frequency = HabitFrequency(
-                        id = "freq1",
-                        habitId = "1",
-                        type = FrequencyType.DAILY
-                    )
+                    bestStreak = 7
                 )
             }
 
@@ -88,11 +84,6 @@ fun HabitCardQuantityPreview() {
                     currentStreak = 5,
                     unitOfMeasurement = "стаканов",
                     bestStreak = 10,
-                    frequency = HabitFrequency(
-                        id = "freq2",
-                        habitId = "2",
-                        type = FrequencyType.DAILY
-                    )
                 )
             }
 
@@ -122,13 +113,7 @@ fun HabitCardTimePreview() {
                     type = HabitType.TIME,
                     targetValue = 30f,
                     currentStreak = 15,
-                    bestStreak = 20,
-                    frequency = HabitFrequency(
-                        id = "freq3",
-                        habitId = "3",
-                        type = FrequencyType.SPECIFIC_DAYS,
-                        daysOfWeek = listOf(1, 3, 5)
-                    )
+                    bestStreak = 20
                 )
             }
 
@@ -176,8 +161,7 @@ fun HabitCard(
             ) {
                 EmojiIcon(
                     emoji = habit.iconEmoji,
-                    backgroundColor = habitColor,
-                    defaultEmoji = "🔄"
+                    backgroundColor = habitColor
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -281,15 +265,6 @@ fun HabitCard(
                 }
             }
 
-            // Отображение частоты (если указана)
-            habit.frequency?.let { frequency ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = formatFrequency(frequency),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }

@@ -24,6 +24,13 @@ interface HabitTrackingDao {
     @Update
     suspend fun updateHabitTracking(tracking: HabitTrackingEntity)
 
+
+    @Query("SELECT * FROM habit_trackings WHERE habitId = :habitId AND date = :date")
+    suspend fun getHabitTrackingForDate(habitId: String, date: String): HabitTrackingEntity?
+
+    @Query("SELECT * FROM habit_trackings WHERE date = :date")
+    suspend fun getAllHabitTrackingsForDate(date: String): List<HabitTrackingEntity>
+
     @Delete
     suspend fun deleteHabitTracking(tracking: HabitTrackingEntity)
 

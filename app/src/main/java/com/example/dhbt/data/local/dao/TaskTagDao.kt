@@ -19,9 +19,8 @@ interface TaskTagDao {
     @Query("DELETE FROM task_tag_cross_refs WHERE tagId = :tagId")
     suspend fun deleteAllTasksForTag(tagId: String)
 
-    @RewriteQueriesToDropUnusedColumns  // Добавлена эта аннотация
     @Transaction
-    @Query("SELECT * FROM tasks INNER JOIN task_tag_cross_refs ON tasks.taskId = task_tag_cross_refs.taskId WHERE task_tag_cross_refs.tagId = :tagId")
+    @Query("SELECT tasks.* FROM tasks INNER JOIN task_tag_cross_refs ON tasks.taskId = task_tag_cross_refs.taskId WHERE task_tag_cross_refs.tagId = :tagId")
     fun getTasksWithTag(tagId: String): Flow<List<TaskEntity>>
 
     @Query("SELECT EXISTS(SELECT 1 FROM task_tag_cross_refs WHERE taskId = :taskId AND tagId = :tagId)")

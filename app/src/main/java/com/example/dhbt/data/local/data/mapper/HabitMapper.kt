@@ -25,7 +25,6 @@ class HabitMapper @Inject constructor() {
             status = HabitStatus.fromInt(entity.status),
             pausedDate = entity.pausedDate,
             categoryId = entity.categoryId,
-            frequency = null // Загружается отдельно
         )
     }
 

@@ -26,5 +26,6 @@ data class TaskDetailState(
     val relatedTasks: List<Task> = emptyList(),
     val showDeleteDialog: Boolean = false,
     val showEditTask: Boolean = false,
-    val showPomodoroDialog: Boolean = false
+    val showPomodoroDialog: Boolean = false,
+    var showDeleteConfirmDialog: Boolean = false
 )

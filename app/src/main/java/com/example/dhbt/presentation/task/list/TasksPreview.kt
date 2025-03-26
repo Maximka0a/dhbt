@@ -19,7 +19,7 @@ import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskRecurrence
 import com.example.dhbt.domain.model.TaskStatus
-import com.example.dhbt.presentation.components.EmptyStateMessage
+import com.example.dhbt.presentation.shared.EmptyStateMessage
 import com.example.dhbt.presentation.theme.DHbtTheme
 import org.threeten.bp.LocalDate
 
@@ -484,13 +484,7 @@ fun PreviewTasksScreenEmpty() {
                     datesWithTasks = emptySet()
                 )
 
-                // Пустое состояние
-                EmptyStateMessage(
-                    message = "Задачи не найдены",
-                    icon = androidx.compose.material.icons.Icons.Default.Assignment,
-                    actionLabel = "Добавить задачу",
-                    onActionClicked = {}
-                )
+
             }
         }
     }

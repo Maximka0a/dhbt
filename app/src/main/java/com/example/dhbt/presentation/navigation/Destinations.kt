@@ -34,7 +34,9 @@ data class HabitEdit(val habitId: String = "")
 
 // Маршруты для Pomodoro
 @Serializable
-object Pomodoro
+data class Pomodoro(
+    val taskId: String = ""
+)
 
 // Маршруты для Матрицы Эйзенхауэра
 @Serializable

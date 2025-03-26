@@ -62,9 +62,15 @@ fun DHbtNavHost(
         composable<TaskDetail> { backStackEntry ->
             val taskData = backStackEntry.toRoute<TaskDetail>()
             TaskDetailScreen(
-                taskId = taskData.taskId,
                 onNavigateBack = { navController.popBackStack() },
-                onEditTask = { navController.navigate(TaskEdit(it)) }
+                onNavigateToEdit = { taskId ->
+                    navController.navigate(TaskEdit(taskId))
+                },
+                onNavigateToPomodoro = { taskId ->
+                    navController.navigate(Pomodoro(taskId = taskId))
+                }
+                // TaskViewModel будет автоматически внедрен через hiltViewModel()
+                // и получит taskId из savedStateHandle через навигационный аргумент
             )
         }
 
@@ -79,26 +85,9 @@ fun DHbtNavHost(
         // Экраны привычек
         composable<HabitDetail> { backStackEntry ->
             val habitData = backStackEntry.toRoute<HabitDetail>()
-            // Здесь можно добавить экран деталей привычки, когда он будет реализован
-            Surface(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Детали привычки ${habitData.habitId}")
-                    Button(onClick = {
-                        navController.navigate(HabitEdit(habitData.habitId))
-                    }) {
-                        Text("Редактировать")
-                    }
-                    Button(onClick = {
-                        navController.popBackStack()
-                    }) {
-                        Text("Назад")
-                    }
-                }
-            }
+            HabitDetailScreen(
+                navController = navController
+            )
         }
 
         composable<HabitEdit> { backStackEntry ->
@@ -109,11 +98,14 @@ fun DHbtNavHost(
         }
 
         // Экран Pomodoro
-        composable<Pomodoro> {
+        composable<Pomodoro> { backStackEntry ->
+            val pomodoroData = backStackEntry.toRoute<Pomodoro>()
             PomodoroScreen(
+                taskId = pomodoroData.taskId, // Передаем ID задачи, если есть
                 navController = navController
             )
         }
+
         composable<EisenhowerMatrix> {
             EisenhowerScreen(navController = navController)
         }
@@ -127,7 +119,8 @@ fun DHbtNavHost(
                 onAddHabit = { navController.navigate(HabitEdit()) },
                 onViewAllTasks = { navController.navigate(Tasks) },
                 onViewAllHabits = { navController.navigate(Habits) },
-                onSettings = {navController.navigate(PremiumSubscription)}
+                onSettings = { navController.navigate(Settings) },
+                onPremiumClicked = { navController.navigate(PremiumSubscription) },
             )
         }
 
@@ -141,26 +134,24 @@ fun DHbtNavHost(
                 }
             )
         }
-        composable<HabitDetail> { backStackEntry ->
-            val habitData = backStackEntry.toRoute<HabitDetail>()
-            HabitDetailScreen(
-                navController = navController
-            )
-        }
+
         composable<PremiumSubscription> {
             SubscriptionScreen(navController = navController)
         }
+
         composable<Habits> {
             HabitsScreen(
                 navController = navController
             )
         }
+
         composable<Settings> {
             SettingsScreen(
                 navController = navController
             )
         }
-        composable<Statistics>{
+
+        composable<Statistics> {
             StatisticsScreen(
                 navController = navController
             )

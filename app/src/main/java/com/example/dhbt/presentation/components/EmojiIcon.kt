@@ -1,4 +1,4 @@
-package com.example.dhbt.presentation.components
+package com.example.dhbt.presentation.shared
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -13,31 +13,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.dhbt.presentation.theme.DHbtTheme
 import com.example.dhbt.presentation.util.toColor
 
 @Composable
 fun EmojiIcon(
     emoji: String?,
-    backgroundColor: Color,
     modifier: Modifier = Modifier,
-    defaultEmoji: String = "📋"
+    backgroundColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+    emojiColor: Color = MaterialTheme.colorScheme.primary,
+    emojiSize: TextUnit = TextUnit.Unspecified,
+    iconSize: Dp = 24.dp
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
+            .size(iconSize)
             .clip(CircleShape)
-            .background(backgroundColor.copy(alpha = 0.12f)),
+            .background(backgroundColor),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = emoji ?: defaultEmoji,
-            style = MaterialTheme.typography.titleMedium
-        )
+        if (emoji.isNullOrEmpty()) {
+            // Fallback icon if emoji is not specified
+            Text(
+                text = "✓",
+                color = emojiColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = emojiSize
+            )
+        } else {
+            Text(
+                text = emoji,
+                fontSize = emojiSize
+            )
+        }
     }
 }
+
 
 @Composable
 fun ColorIndicator(

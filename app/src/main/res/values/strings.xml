@@ -17,7 +17,9 @@
     <string name="no_habits_for_today">Нет привычек на сегодня</string>
     <string name="add">Добавить</string>
     <string name="close">Закрыть</string>
-
+    <string name="loading_data">Загрузка данных…</string>
+    <string name="empty_dashboard_title">Начните свой день</string>
+    <string name="empty_dashboard_subtitle">Добавьте задачи и привычки, чтобы начать отслеживать свой прогресс</string>
 
     <!-- Tasks Screen -->
     <string name="no_tasks">Нет задач</string>
@@ -70,6 +72,7 @@
     <string name="streak">Серия: %d дней</string>
     <string name="best_streak">Рекорд: %d дней</string>
     <string name="today_progress">Сегодня: %d/%d</string>
+    <string name="mark_as_not_completed">Отметить как невыполненное</string>
 
     <!-- Habit Detail -->
     <string name="habit_details">Детали привычки</string>
@@ -261,15 +264,6 @@
     <string name="days">дней</string>
     <string name="remove_recurrence">Удалить повторение</string>
 
-    <!-- Краткие названия дней недели -->
-    <string name="monday_short">Пн</string>
-    <string name="tuesday_short">Вт</string>
-    <string name="wednesday_short">Ср</string>
-    <string name="thursday_short">Чт</string>
-    <string name="friday_short">Пт</string>
-    <string name="saturday_short">Сб</string>
-    <string name="sunday_short">Вс</string>
-
     <!-- Pomodoro -->
     <string name="estimated_sessions">Запланировано сессий</string>
     <string name="total_focus_time">Общее время фокуса</string>
@@ -351,4 +345,114 @@
     <string name="more_actions">Ещё действия</string>
     <string name="previous_week">Предыдущая неделя</string>
     <string name="next_week">Следующая неделя</string>
+    <string name="mark_as_completed">Отметить как выполненное</string>
+
+
+
+    <!-- Общие -->
+    <string name="none">Нет</string>
+
+    <!-- Экран редактирования задачи -->
+    <string name="enter_task_title">Введите название задачи</string>
+    <string name="title_required">Необходимо указать название задачи</string>
+    <string name="enter_task_description">Добавьте подробное описание задачи (необязательно)</string>
+
+    <!-- Цвета -->
+    <string name="color_label">Цветовая метка</string>
+    <string name="selected_color">Выбран цвет: %s</string>
+
+    <!-- Категории -->
+    <string name="add_new">Добавить новую</string>
+    <string name="no_categories">У вас пока нет категорий</string>
+    <string name="create_category">Создать категорию</string>
+    <string name="enter_category_name">Введите название категории</string>
+    <string name="select_icon">Выберите иконку</string>
+
+    <!-- Даты и время -->
+    <string name="due_date_time">Срок выполнения</string>
+
+    <!-- Приоритеты -->
+    <string name="priority_high">Высокий</string>
+    <string name="priority_medium">Средний</string>
+    <string name="priority_low">Низкий</string>
+
+    <!-- Матрица Эйзенхауэра -->
+    <string name="quadrant1_title">Важно и срочно</string>
+    <string name="quadrant1_action">Сделать сейчас</string>
+    <string name="quadrant2_title">Важно, не срочно</string>
+    <string name="quadrant2_action">Запланировать</string>
+    <string name="quadrant3_title">Не важно, но срочно</string>
+    <string name="quadrant3_action">Делегировать</string>
+    <string name="quadrant4_title">Не важно, не срочно</string>
+    <string name="quadrant4_action">Исключить</string>
+
+    <!-- Теги -->
+    <string name="add_tag">Добавить тег</string>
+    <string name="create_tag">Создать тег</string>
+    <string name="enter_tag_name">Введите название тега</string>
+    <string name="tag_color">Цвет тега</string>
+
+    <!-- Подзадачи -->
+    <string name="delete_subtask">Удалить подзадачу</string>
+
+    <!-- Повторение -->
+    <string name="repeat_on_days">Повторять по дням</string>
+    <string name="repeat_on_day_of_month">Повторять в определенный день месяца</string>
+    <string name="repeat_every_x_days">Повторять каждые X дней</string>
+    <string name="enter_day_1_31">Введите день (1-31)</string>
+    <string name="valid_values_1_31">Допустимые значения: от 1 до 31</string>
+    <string name="days_interval">Интервал в днях</string>
+    <string name="enter_days_count">Введите количество дней</string>
+    <string name="every_x_days_explanation">Задача будет повторяться каждые указанные дни</string>
+
+    <!-- Дни недели -->
+    <string name="monday_short">Пн</string>
+    <string name="tuesday_short">Вт</string>
+    <string name="wednesday_short">Ср</string>
+    <string name="thursday_short">Чт</string>
+    <string name="friday_short">Пт</string>
+    <string name="saturday_short">Сб</string>
+    <string name="sunday_short">Вс</string>
+
+    <!-- Дополнительные параметры -->
+    <string name="additional_parameters">Дополнительно</string>
+    <string name="duration_minutes">Длительность (минут)</string>
+    <string name="estimated_pomodoros">Оценка времени в "помидорах"</string>
+    <string name="pomodoro_explanation">Один "помидор" = 25 минут фокусированной работы</string>
+    <string name="back">Назад</string>
+
+    <!-- Общие строки -->
+    <string name="go_back">Вернуться</string>
+    <string name="retry">Повторить</string>
+    <!-- Экран деталей задачи -->
+    <string name="loading_task">Загрузка задачи…</string>
+    <string name="task_not_found">Задача не найдена</string>
+    <string name="additional_info">Дополнительная информация</string>
+    <string name="start_pomodoro">Начать помидор</string>
+    <!-- Статусы задач -->
+    <string name="mark_as_complete">Отметить как выполненную</string>
+    <string name="in_progress">В процессе</string>
+    <string name="paused">Приостановлена</string>
+    <string name="change_status">Изменить статус</string>
+    <string name="completed_desc">Задача полностью выполнена</string>
+    <string name="active_desc">Задача ожидает выполнения</string>
+    <string name="in_progress_desc">Задача выполняется сейчас</string>
+    <string name="paused_desc">Задача временно приостановлена</string>
+    <!-- Информационные поля -->
+    <string name="due_time">Время выполнения</string>
+    <string name="subtasks_completion_count">Выполнено %1$d из %2$d</string>
+    <string name="duration">Продолжительность</string>
+    <!-- Матрица Эйзенхауэра -->
+    <string name="quadrant1">Важно и срочно</string>
+    <string name="quadrant2">Важно, не срочно</string>
+    <string name="quadrant3">Не важно, но срочно</string>
+    <string name="quadrant4">Не важно, не срочно</string>
+    <string name="do_first">Сделать первым</string>
+    <string name="schedule">Запланировать</string>
+    <string name="delegate">Делегировать</string>
+    <string name="eliminate">Исключить</string>
+    <string name="completed_at">Выполнено</string>
+    <string name="pomodoro_count">%d помидоров</string>
+    <string name="start_pomodoro_session">Начать помидор</string>
+    <string name="confirm_delete_task">Удалить задачу?</string>
 </resources>

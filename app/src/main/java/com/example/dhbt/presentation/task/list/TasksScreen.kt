@@ -38,8 +38,9 @@ import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskStatus
-import com.example.dhbt.presentation.components.EmptyStateMessage
-import com.example.dhbt.presentation.components.EmojiIcon
+import com.example.dhbt.presentation.shared.EmojiIcon
+import com.example.dhbt.presentation.shared.EmptyStateMessage
+import com.example.dhbt.presentation.shared.EmptyStateWithIcon
 import com.example.dhbt.presentation.util.toColor
 import kotlinx.coroutines.launch
 import me.saket.swipe.SwipeAction
@@ -147,7 +148,7 @@ fun TasksScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.tasks.isEmpty()) {
-                EmptyStateMessage(
+                EmptyStateWithIcon(
                     message = stringResource(R.string.no_tasks_found),
                     icon = Icons.Default.Assignment,
                     actionLabel = stringResource(R.string.add_task),

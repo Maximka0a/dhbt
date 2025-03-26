@@ -32,3 +32,11 @@ fun String?.toColor(defaultColor: Color = Color.Gray): Color {
         defaultColor
     }
 }
+
+fun parseColor(colorString: String?, defaultColor: Color): Color {
+    return try {
+        colorString?.let { Color(android.graphics.Color.parseColor(it)) } ?: defaultColor
+    } catch (e: Exception) {
+        defaultColor
+    }
+}

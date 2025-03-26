@@ -1,5 +1,6 @@
 package com.example.dhbt.data.repository
 
+import androidx.room.Transaction
 import com.example.dhbt.data.local.dao.HabitDao
 import com.example.dhbt.data.local.dao.HabitFrequencyDao
 import com.example.dhbt.data.local.dao.HabitTrackingDao
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
+import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 
@@ -27,30 +29,195 @@ class HabitRepositoryImpl @Inject constructor(
     private val habitFrequencyMapper: HabitFrequencyMapper,
     private val habitTrackingMapper: HabitTrackingMapper
 ) : HabitRepository {
-
+    // Базовые операции с привычками
     override fun getAllHabits(): Flow<List<Habit>> {
         return habitDao.getAllHabits().map { entities ->
-            entities.map { entity ->
-                val habit = habitMapper.mapFromEntity(entity)
-                // Загрузка частоты привычки
-                val frequencyEntity = habitFrequencyDao.getFrequencyForHabit(entity.habitId)
-                val frequency = frequencyEntity?.let { habitFrequencyMapper.mapFromEntity(it) }
-                habit.copy(frequency = frequency)
-            }
+            entities.map { habitMapper.mapFromEntity(it) }
         }
     }
 
     override fun getActiveHabits(): Flow<List<Habit>> {
         return habitDao.getHabitsByStatus(HabitStatus.ACTIVE.value).map { entities ->
+            entities.map { habitMapper.mapFromEntity(it) }
+        }
+    }
+
+    override fun getHabitsByCategory(categoryId: String): Flow<List<Habit>> {
+        return habitDao.getHabitsByCategory(categoryId).map { entities ->
+            entities.map { habitMapper.mapFromEntity(it) }
+        }
+    }
+
+    override suspend fun getHabitById(habitId: String): Habit? {
+        val entity = habitDao.getHabitById(habitId) ?: return null
+        return habitMapper.mapFromEntity(entity)
+    }
+
+    override suspend fun addHabit(habit: Habit): String {
+        try {
+            val entity = habitMapper.mapToEntity(habit)
+            habitDao.insertHabit(entity)
+            Timber.d("Привычка добавлена с ID: ${habit.id}")
+            return habit.id
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при добавлении привычки")
+            throw e
+        }
+    }
+
+    override suspend fun updateHabit(habit: Habit) {
+        try {
+            val entity = habitMapper.mapToEntity(habit)
+            habitDao.updateHabit(entity)
+            Timber.d("Привычка обновлена с ID: ${habit.id}")
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при обновлении привычки")
+            throw e
+        }
+    }
+    // Добавьте метод для транзакционного добавления привычки с частотой
+    suspend fun addHabitWithFrequency(habit: Habit, frequency: HabitFrequency): String {
+        // Открываем транзакцию
+        try {
+            // Сохраняем привычку
+            val habitId = habit.id
+            habitDao.insertHabit(habitMapper.mapToEntity(habit))
+
+            // Сохраняем частоту
+            val frequencyEntity = habitFrequencyMapper.mapToEntity(frequency.copy(habitId = habitId))
+            habitFrequencyDao.insertHabitFrequency(frequencyEntity)
+
+            Timber.d("Транзакция успешно завершена. Сохранены привычка и частота: $habitId")
+            return habitId
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка транзакции при сохранении привычки с частотой")
+            throw e
+        }
+    }
+
+    override suspend fun deleteHabit(habitId: String) {
+        try {
+            habitDao.deleteHabitById(habitId)
+            Timber.d("Привычка удалена с ID: $habitId")
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при удалении привычки")
+            throw e
+        }
+    }
+
+    // Новые методы для работы с привычкой и частотой вместе
+    override suspend fun getHabitWithFrequency(habitId: String): Pair<Habit, HabitFrequency?> {
+        val habit = getHabitById(habitId)
+            ?: throw NoSuchElementException("Привычка с ID $habitId не найдена")
+        val frequency = getHabitFrequency(habitId)
+        return Pair(habit, frequency)
+    }
+
+    override fun getAllHabitsWithFrequency(): Flow<List<Pair<Habit, HabitFrequency?>>> {
+        return habitDao.getAllHabits().map { entities ->
             entities.map { entity ->
                 val habit = habitMapper.mapFromEntity(entity)
-                // Загрузка частоты привычки
-                val frequencyEntity = habitFrequencyDao.getFrequencyForHabit(entity.habitId)
-                val frequency = frequencyEntity?.let { habitFrequencyMapper.mapFromEntity(it) }
-                habit.copy(frequency = frequency)
+                val frequency = habitFrequencyDao.getFrequencyForHabit(entity.habitId)?.let {
+                    habitFrequencyMapper.mapFromEntity(it)
+                }
+                Pair(habit, frequency)
             }
         }
     }
+
+    override fun getActiveHabitsWithFrequency(): Flow<List<Pair<Habit, HabitFrequency?>>> {
+        return habitDao.getHabitsByStatus(HabitStatus.ACTIVE.value).map { entities ->
+            entities.map { entity ->
+                val habit = habitMapper.mapFromEntity(entity)
+                val frequency = habitFrequencyDao.getFrequencyForHabit(entity.habitId)?.let {
+                    habitFrequencyMapper.mapFromEntity(it)
+                }
+                Pair(habit, frequency)
+            }
+        }
+    }
+
+    // Методы для работы с частотой
+    override suspend fun getHabitFrequency(habitId: String): HabitFrequency? {
+        val entity = habitFrequencyDao.getFrequencyForHabit(habitId) ?: return null
+        return habitFrequencyMapper.mapFromEntity(entity)
+    }
+
+    override suspend fun setHabitFrequency(habitId: String, frequency: HabitFrequency) {
+        try {
+            // Проверяем, что привычка существует
+            val habitExists = habitDao.getHabitById(habitId) != null
+            if (!habitExists) {
+                Timber.e("Ошибка: привычка с ID $habitId не найдена")
+                throw IllegalArgumentException("Привычка с ID $habitId не существует")
+            }
+
+            // Удаляем существующую частоту, если есть
+            habitFrequencyDao.deleteFrequencyForHabit(habitId)
+
+            // Сохраняем новую частоту
+            val entity = habitFrequencyMapper.mapToEntity(frequency.copy(habitId = habitId))
+            habitFrequencyDao.insertHabitFrequency(entity)
+            Timber.d("Частота привычки установлена для ID: $habitId")
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при установке частоты привычки")
+            throw e
+        }
+    }
+
+    override suspend fun updateHabitFrequency(frequency: HabitFrequency) {
+        try {
+            val entity = habitFrequencyMapper.mapToEntity(frequency)
+            habitFrequencyDao.updateHabitFrequency(entity)
+            Timber.d("Частота привычки обновлена для ID: ${frequency.habitId}")
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при обновлении частоты привычки")
+            throw e
+        }
+    }
+
+    override suspend fun deleteHabitFrequency(habitId: String) {
+        try {
+            habitFrequencyDao.deleteFrequencyForHabit(habitId)
+            Timber.d("Частота привычки удалена для ID: $habitId")
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при удалении частоты привычки")
+            throw e
+        }
+    }
+
+    override suspend fun getHabitProgressForToday(habitId: String): Float {
+        // Используем timestamp для сегодняшнего дня вместо строки
+        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        val tracking = habitTrackingDao.getHabitTrackingForDate(
+            habitId = habitId,
+            date = today // Передаем timestamp
+        )
+
+        // Логирование для отладки
+        val value = tracking?.value ?: 0f
+        println("Получен прогресс для привычки $habitId: $value")
+
+        return value
+    }
+
+    override suspend fun getAllHabitsProgressForToday(): Map<String, Float> {
+        // Конвертируем timestamp в String формат, который ожидает DAO
+        val today = LocalDate.now().toString()
+
+        // Теперь передаем String вместо Long
+        val trackings = habitTrackingDao.getAllHabitTrackingsForDate(date = today)
+
+        // Логирование для отладки
+        println("Получено ${trackings.size} записей прогресса привычек за сегодня")
+        trackings.forEach {
+            println("Привычка ${it.habitId}: прогресс ${it.value}")
+        }
+
+        return trackings.associate { it.habitId to (it.value ?: 0f) }
+    }
+
     // Добавляем реализацию метода incrementHabitProgress
     override suspend fun incrementHabitProgress(habitId: String) {
         // Получаем привычку
@@ -72,6 +239,7 @@ class HabitRepositoryImpl @Inject constructor(
                     )
                     updateHabitTracking(updatedTracking)
                 }
+
                 HabitType.QUANTITY -> {
                     // Для количественного типа увеличиваем значение на 1
                     val currentValue = existingTracking.value ?: 0f
@@ -85,6 +253,7 @@ class HabitRepositoryImpl @Inject constructor(
                     )
                     updateHabitTracking(updatedTracking)
                 }
+
                 HabitType.TIME -> {
                     // Для времени увеличиваем на 1 минуту (или другую логику)
                     val currentDuration = existingTracking.duration ?: 0
@@ -122,60 +291,7 @@ class HabitRepositoryImpl @Inject constructor(
             trackHabit(tracking)
         }
     }
-    override fun getHabitsByCategory(categoryId: String): Flow<List<Habit>> {
-        return habitDao.getHabitsByCategory(categoryId).map { entities ->
-            entities.map { entity ->
-                val habit = habitMapper.mapFromEntity(entity)
-                // Загрузка частоты привычки
-                val frequencyEntity = habitFrequencyDao.getFrequencyForHabit(entity.habitId)
-                val frequency = frequencyEntity?.let { habitFrequencyMapper.mapFromEntity(it) }
-                habit.copy(frequency = frequency)
-            }
-        }
-    }
 
-    override suspend fun getHabitById(habitId: String): Habit? {
-        val entity = habitDao.getHabitById(habitId) ?: return null
-        val habit = habitMapper.mapFromEntity(entity)
-
-        // Загрузка частоты привычки
-        val frequencyEntity = habitFrequencyDao.getFrequencyForHabit(habitId)
-        val frequency = frequencyEntity?.let { habitFrequencyMapper.mapFromEntity(it) }
-
-        return habit.copy(frequency = frequency)
-    }
-
-    override suspend fun addHabit(habit: Habit): String {
-        val habitEntity = habitMapper.mapToEntity(habit)
-        val habitId = habitDao.insertHabit(habitEntity).toString()
-
-        // Сохранение частоты привычки
-        habit.frequency?.let { frequency ->
-            val frequencyEntity = habitFrequencyMapper.mapToEntity(
-                frequency.copy(habitId = habitId)
-            )
-            habitFrequencyDao.insertHabitFrequency(frequencyEntity)
-        }
-
-        return habitId
-    }
-
-    override suspend fun updateHabit(habit: Habit) {
-        val habitEntity = habitMapper.mapToEntity(habit)
-        habitDao.updateHabit(habitEntity)
-
-        // Обновление частоты привычки
-        habitFrequencyDao.deleteFrequencyForHabit(habit.id)
-        habit.frequency?.let { frequency ->
-            val frequencyEntity = habitFrequencyMapper.mapToEntity(frequency)
-            habitFrequencyDao.insertHabitFrequency(frequencyEntity)
-        }
-    }
-
-    override suspend fun deleteHabit(habitId: String) {
-        habitDao.deleteHabitById(habitId)
-        // Каскадное удаление частоты и отслеживаний происходит автоматически
-    }
 
     override suspend fun changeHabitStatus(habitId: String, status: HabitStatus) {
         habitDao.updateHabitStatus(habitId, status.value)
@@ -189,17 +305,6 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getHabitFrequency(habitId: String): HabitFrequency? {
-        val entity = habitFrequencyDao.getFrequencyForHabit(habitId) ?: return null
-        return habitFrequencyMapper.mapFromEntity(entity)
-    }
-
-    override suspend fun setHabitFrequency(habitId: String, frequency: HabitFrequency) {
-        val frequencyEntity = habitFrequencyMapper.mapToEntity(
-            frequency.copy(habitId = habitId)
-        )
-        habitFrequencyDao.insertHabitFrequency(frequencyEntity)
-    }
 
     override fun getHabitTrackings(habitId: String): Flow<List<HabitTracking>> {
         return habitTrackingDao.getTrackingsForHabit(habitId).map { entities ->
@@ -207,10 +312,15 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getHabitTrackingsForRange(habitId: String, startDate: Long, endDate: Long): Flow<List<HabitTracking>> {
-        return habitTrackingDao.getTrackingsForHabitInRange(habitId, startDate, endDate).map { entities ->
-            entities.map { habitTrackingMapper.mapFromEntity(it) }
-        }
+    override fun getHabitTrackingsForRange(
+        habitId: String,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<HabitTracking>> {
+        return habitTrackingDao.getTrackingsForHabitInRange(habitId, startDate, endDate)
+            .map { entities ->
+                entities.map { habitTrackingMapper.mapFromEntity(it) }
+            }
     }
 
     override suspend fun getHabitTrackingForDate(habitId: String, date: Long): HabitTracking? {
@@ -253,7 +363,8 @@ class HabitRepositoryImpl @Inject constructor(
         val endDate = today.plusDays(1)
             .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-        val completedCount = habitTrackingDao.countCompletedTrackingsInRange(habitId, startDate, endDate)
+        val completedCount =
+            habitTrackingDao.countCompletedTrackingsInRange(habitId, startDate, endDate)
         return completedCount.toFloat() / days
     }
 
@@ -270,10 +381,14 @@ class HabitRepositoryImpl @Inject constructor(
                 val value = tracking.value ?: 0f
                 (value / targetValue).coerceIn(0f, 1f)
             }
+
             HabitType.TIME -> {
                 val targetDuration = habit.targetValue?.toInt() ?: 0
                 val duration = tracking.duration ?: 0
-                if (targetDuration <= 0) 0f else (duration.toFloat() / targetDuration).coerceIn(0f, 1f)
+                if (targetDuration <= 0) 0f else (duration.toFloat() / targetDuration).coerceIn(
+                    0f,
+                    1f
+                )
             }
         }
     }

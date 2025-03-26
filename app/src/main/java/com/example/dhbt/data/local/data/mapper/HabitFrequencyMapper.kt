@@ -7,6 +7,7 @@ import com.example.dhbt.domain.model.PeriodType
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import javax.inject.Inject
 
 class HabitFrequencyMapper @Inject constructor() {
@@ -14,18 +15,25 @@ class HabitFrequencyMapper @Inject constructor() {
     fun mapFromEntity(entity: HabitFrequencyEntity): HabitFrequency {
         val daysOfWeek = entity.daysOfWeek?.let { daysJson ->
             try {
-                // First try normal JSON parsing
-                Json.decodeFromString<List<Int>>(daysJson)
-            } catch (e: Exception) {
-                // If that fails, try parsing as comma-separated values
+                // Пробуем разные варианты парсинга
                 try {
-                    daysJson.split(",").map { it.trim().toInt() }
-                } catch (e2: Exception) {
-                    // If all parsing fails, return null
-                    null
+                    // Стандартное JSON-парсинг
+                    Json.decodeFromString<List<Int>>(daysJson)
+                } catch (e: Exception) {
+                    Timber.w("Не удалось разобрать JSON дней недели, пробуем CSV: $daysJson")
+                    try {
+                        // Пробуем парсинг как CSV
+                        daysJson.split(",").map { it.trim().toInt() }
+                    } catch (e2: Exception) {
+                        Timber.e(e2, "Все попытки парсинга дней недели не удались: $daysJson")
+                        emptyList() // Возвращаем пустой список вместо null
+                    }
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Критическая ошибка при обработке дней недели: $daysJson")
+                emptyList() // В случае ошибки возвращаем пустой список
             }
-        }
+        } ?: emptyList()
 
         return HabitFrequency(
             id = entity.frequencyId,
@@ -38,10 +46,20 @@ class HabitFrequencyMapper @Inject constructor() {
     }
 
     fun mapToEntity(domain: HabitFrequency): HabitFrequencyEntity {
-        val daysOfWeekJson = domain.daysOfWeek?.let { days ->
-            // Always ensure proper JSON array format
-            Json.encodeToString(days)
+        val daysOfWeekJson = try {
+            // Проверяем на null или пустой список
+            if (domain.daysOfWeek.isNullOrEmpty()) {
+                null
+            } else {
+                // Безопасная сериализация
+                Json.encodeToString(domain.daysOfWeek)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при сериализации дней недели: ${domain.daysOfWeek}")
+            null // Если сериализация не удалась, сохраняем null
         }
+
+        Timber.d("Сериализация дней недели: ${domain.daysOfWeek} -> $daysOfWeekJson")
 
         return HabitFrequencyEntity(
             frequencyId = domain.id,

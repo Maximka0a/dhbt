@@ -10,6 +10,7 @@ import com.example.dhbt.domain.repository.TagRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
 import org.threeten.bp.format.DateTimeFormatter
@@ -401,7 +402,9 @@ class HabitDetailViewModel @Inject constructor(
     // Получение форматированной строки для отображения частоты
     fun getFrequencyText(): String {
         val habit = _habit.value ?: return "Ежедневно"
-        val frequency = habit.frequency ?: return "Ежедневно"
+
+        // Получаем частоту из репозитория, т.к. она больше не хранится в Habit
+        val frequency = runBlocking { habitRepository.getHabitFrequency(habit.id) } ?: return "Ежедневно"
 
         return when (frequency.type) {
             FrequencyType.DAILY -> "Ежедневно"
@@ -415,7 +418,7 @@ class HabitDetailViewModel @Inject constructor(
                         "$dayNumber"
                     }
                 }
-                "По дням: ${dayNames.joinToString(", ")}"
+                "По дням: ${days.joinToString<Int>(", ")}"
             }
             FrequencyType.TIMES_PER_WEEK -> {
                 val times = frequency.timesPerPeriod ?: 1
@@ -425,6 +428,7 @@ class HabitDetailViewModel @Inject constructor(
                 val times = frequency.timesPerPeriod ?: 1
                 "$times раз в месяц"
             }
+            else -> "Ежедневно" // добавляем ветку else для исчерпывающего when
         }
     }
 

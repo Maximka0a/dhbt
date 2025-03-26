@@ -16,7 +16,6 @@ data class Habit(
     val status: HabitStatus = HabitStatus.ACTIVE,
     val pausedDate: Long? = null,
     val categoryId: String? = null,
-    val frequency: HabitFrequency? = null
 )
 
 enum class HabitType(val value: Int) {

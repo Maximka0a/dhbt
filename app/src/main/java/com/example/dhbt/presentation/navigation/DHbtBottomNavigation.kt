@@ -71,7 +71,7 @@ fun DHbtBottomNavigation(navController: NavController) {
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
+
     ) {
         items.forEach { item ->
             val isSelected = currentDestination?.route?.contains(item.route::class.qualifiedName ?: "") == true

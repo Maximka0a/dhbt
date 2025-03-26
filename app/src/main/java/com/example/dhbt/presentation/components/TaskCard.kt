@@ -19,6 +19,7 @@ import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskStatus
+import com.example.dhbt.presentation.shared.ColorIndicator
 import com.example.dhbt.presentation.theme.DHbtTheme
 import com.example.dhbt.presentation.util.toColor
 import java.text.SimpleDateFormat

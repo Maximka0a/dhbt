@@ -1,5 +1,6 @@
 package com.example.dhbt.presentation.dashboard
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dhbt.domain.model.Habit
@@ -13,11 +14,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
+import java.time.format.TextStyle
+import java.util.*
 import javax.inject.Inject
+
+private const val TAG = "DashboardViewModel"
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -48,71 +50,196 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadData()
+        logCurrentDay()
+    }
+
+    // Логирование текущего дня для отладки
+    private fun logCurrentDay() {
+        val today = LocalDate.now()
+        val dayOfWeek = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        val formattedDate = getTodayFormatted()
+
+        Log.d(TAG, "===== Сегодняшний день =====")
+        Log.d(TAG, "Дата: $formattedDate")
+        Log.d(TAG, "День недели: $dayOfWeek (значение: ${today.dayOfWeek.value})")
+        Log.d(TAG, "Timeststamp начала дня: $today")
+        Log.d(TAG, "Timeststamp конца дня: $tomorrow")
     }
 
     private fun loadData() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+            _state.update { it.copy(isLoading = true, isRefreshing = true) }
 
-            // Комбинируем потоки данных из репозиториев
-            combine(
-                userPreferencesRepository.getUserData(),
-                taskRepository.getAllTasks(),
-                habitRepository.getAllHabits()
-            ) { userData, tasks, habits ->
-                // Фильтруем задачи и привычки на сегодня
-                val todayTasks = filterTasksForToday(tasks)
-                val todayHabits = filterHabitsForToday(habits)
+            try {
+                // Получаем данные о прогрессе привычек на сегодня
+                val todayProgresses = habitRepository.getAllHabitsProgressForToday()
 
-                // Считаем статистику
-                val completedTasks = todayTasks.count { it.status == TaskStatus.COMPLETED }
-                val totalTasks = todayTasks.size
+                // Комбинируем потоки данных из репозиториев
+                combine(
+                    userPreferencesRepository.getUserData(),
+                    taskRepository.getAllTasks(),
+                    habitRepository.getAllHabits()
+                ) { userData, tasks, habits ->
+                    // Логирование и фильтрация как было раньше
 
-                val completedHabits = todayHabits.count { it.status.value == 1 }
-                val totalHabits = todayHabits.size
+                    // Фильтруем задачи и привычки на сегодня
+                    val todayTasks = filterTasksForToday(tasks)
+                    val todayHabits = filterHabitsForToday(habits)
 
-                // Обновляем состояние
+                    // Логирование привычек с АКТУАЛЬНЫМ прогрессом с сегодня
+                    Log.d(TAG, "===== Привычки на сегодня с актуальным прогрессом (${todayHabits.size}) =====")
+                    todayHabits.forEach { habit ->
+                        val actualProgress = todayProgresses[habit.id] ?: 0f
+                        Log.d(TAG, "Привычка: ${habit.title}, " +
+                                "ID: ${habit.id}, " +
+                                "Тип: ${habit.type.value}, " +
+                                "Статус: ${habit.status.value}, " +
+                                "Текущий прогресс в БД: ${habit.currentStreak}/${habit.targetValue ?: 1}, " +
+                                "Сегодняшний прогресс: $actualProgress/${habit.targetValue ?: 1}")
+                    }
+
+                    // Привязываем данные о сегодняшних прогрессах к привычкам для UI
+// Привязываем данные о сегодняшних прогрессах к привычкам для UI
+                    val todayHabitsWithProgress = todayHabits.map { habit ->
+                        // Создаем копию привычки с актуальным прогрессом на сегодня
+                        val todayProgress = todayProgresses[habit.id] ?: 0f
+
+                        // Округляем или обрезаем до целого числа в зависимости от типа привычки
+                        val progressAsInt = when (habit.type.value) {
+                            0 -> if (todayProgress >= 1f) 1 else 0 // BINARY: 0 или 1
+                            1 -> todayProgress.toInt() // QUANTITY: количество целых единиц
+                            2 -> todayProgress.toInt() // TIME: количество целых минут
+                            else -> 0
+                        }
+
+                        // Логируем для отладки преобразование типов
+                        Log.d(TAG, "Привычка ${habit.title}: преобразование прогресса $todayProgress (Float) -> $progressAsInt (Int)")
+
+                        habit.copy(currentStreak = progressAsInt)
+                    }
+                    // Считаем статистику с актуальным прогрессом
+                    val completedTasks = todayTasks.count { it.status == TaskStatus.COMPLETED }
+                    val totalTasks = todayTasks.size
+
+                    val completedHabits = countCompletedHabitsWithTodayProgress(todayHabitsWithProgress, todayProgresses)
+                    val totalHabits = todayHabitsWithProgress.size
+
+                    // Обновляем состояние с актуальными данными
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            userData = userData,
+                            todayTasks = todayTasks,
+                            todayHabits = todayHabitsWithProgress,
+                            completedTasks = completedTasks,
+                            totalTasks = totalTasks,
+                            completedHabits = completedHabits,
+                            totalHabits = totalHabits,
+                            error = null
+                        )
+                    }
+                }.catch { error ->
+                    // Обработка ошибок как было
+                }.collect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading today's habit progress", e)
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        userData = userData,
-                        todayTasks = todayTasks,
-                        todayHabits = todayHabits,
-                        completedTasks = completedTasks,
-                        totalTasks = totalTasks,
-                        completedHabits = completedHabits,
-                        totalHabits = totalHabits,
-                        error = null
+                        isRefreshing = false,
+                        error = e.message ?: "Ошибка при загрузке данных о прогрессе привычек"
                     )
                 }
-            }.catch { error ->
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = error.message ?: "Произошла ошибка при загрузке данных"
-                    )
-                }
-            }.collect()
+            }
         }
     }
 
+    // Подсчет выполненных привычек на сегодня с актуальным прогрессом
+    private fun countCompletedHabitsWithTodayProgress(
+        habits: List<Habit>,
+        todayProgresses: Map<String, Float>
+    ): Int {
+        return habits.count { habit ->
+            val todayProgress = todayProgresses[habit.id] ?: 0f
+
+            when (habit.type.value) {
+                0 -> todayProgress >= 1f  // BINARY: выполнено, если прогресс >= 1
+                1, 2 -> { // QUANTITY или TIME
+                    val target = habit.targetValue ?: 1f
+                    todayProgress >= target
+                }
+                else -> false
+            }
+        }
+    }
+
+    // Обновление обработчика инкремента прогресса
+    fun onHabitProgressIncrement(habitId: String) {
+        viewModelScope.launch {
+            Log.d(TAG, "Увеличение прогресса привычки $habitId")
+            try {
+                habitRepository.incrementHabitProgress(habitId)
+
+                // После инкремента получаем актуальный прогресс на сегодня
+                val todayProgress = habitRepository.getHabitProgressForToday(habitId)
+                val habit = habitRepository.getHabitById(habitId)
+
+                Log.d(TAG, "Привычка после инкремента: $habitId, " +
+                        "текущий прогресс в БД: ${habit?.currentStreak}/${habit?.targetValue}, " +
+                        "прогресс на сегодня: $todayProgress/${habit?.targetValue}")
+
+                // Обновляем UI после изменения прогресса
+                refresh()
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при обновлении прогресса привычки", e)
+                _state.update {
+                    it.copy(error = "Ошибка при обновлении прогресса привычки: ${e.message}")
+                }
+            }
+        }
+    }
     // Обработчики событий UI
+// Метод для переключения статуса задачи
     fun onTaskCheckedChange(taskId: String, isCompleted: Boolean) {
         viewModelScope.launch {
+            // Устанавливаем указанный статус (isCompleted уже содержит целевой статус)
             val newStatus = if (isCompleted) TaskStatus.COMPLETED else TaskStatus.ACTIVE
+            Log.d(TAG, "Изменение статуса задачи $taskId на $newStatus")
             taskRepository.updateTaskStatus(taskId, newStatus)
+        }
+    }
+
+    // Новый метод для простого переключения текущего статуса без указания целевого значения
+    fun toggleTaskStatus(taskId: String) {
+        viewModelScope.launch {
+            try {
+                // Получаем текущую задачу
+                val task = taskRepository.getTaskById(taskId)
+                if (task != null) {
+                    // Определяем текущий статус и переключаем на противоположный
+                    val currentStatus = task.status
+                    val newStatus = if (currentStatus == TaskStatus.COMPLETED)
+                        TaskStatus.ACTIVE
+                    else
+                        TaskStatus.COMPLETED
+
+                    Log.d(TAG, "Переключение статуса задачи $taskId с ${currentStatus} на ${newStatus}")
+                    taskRepository.updateTaskStatus(taskId, newStatus)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при переключении статуса задачи", e)
+                _state.update {
+                    it.copy(error = "Ошибка при обновлении статуса задачи: ${e.message}")
+                }
+            }
         }
     }
 
     fun onDeleteTask(taskId: String) {
         viewModelScope.launch {
+            Log.d(TAG, "Удаление задачи $taskId")
             taskRepository.deleteTask(taskId)
-        }
-    }
-
-    fun onHabitProgressIncrement(habitId: String) {
-        viewModelScope.launch {
-           habitRepository.incrementHabitProgress(habitId)
         }
     }
 
@@ -121,46 +248,66 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _state.update { it.copy(isRefreshing = true) }
         loadData()
     }
 
-    // Фильтрация задач на сегодня
+    // Фильтрация задач на сегодня (включая выполненные)
     private fun filterTasksForToday(tasks: List<Task>): List<Task> {
         return tasks.filter { task ->
-            // Фильтруем активные задачи с дедлайном на сегодня или просроченные
+            // Фильтруем задачи с дедлайном на сегодня (включая выполненные)
             val dueDate = task.dueDate ?: return@filter false
-            val isActive = task.status == TaskStatus.ACTIVE
 
             // Задача на сегодня или просрочена
             val isDueToday = dueDate in today until tomorrow
-            val isOverdue = dueDate < today
+            val isOverdue = dueDate < today && task.status == TaskStatus.ACTIVE
 
-            isActive && (isDueToday || isOverdue)
-        }.sortedBy { it.dueDate } // Сортировка по дате выполнения
+            isDueToday || isOverdue
+        }.sortedWith(compareBy(
+            // Сначала активные, потом выполненные
+            { it.status != TaskStatus.ACTIVE },
+            // Потом по времени
+            { it.dueDate }
+        ))
     }
 
     // Фильтрация привычек на сегодня
-    private fun filterHabitsForToday(habits: List<Habit>): List<Habit> {
+    // Фильтрация привычек на сегодня
+    private suspend fun filterHabitsForToday(habits: List<Habit>): List<Habit> {
         val today = LocalDate.now()
         val dayOfWeek = today.dayOfWeek.value // 1 (понедельник) - 7 (воскресенье)
 
+        Log.d(TAG, "Фильтрация привычек по дню недели: $dayOfWeek")
+
         return habits.filter { habit ->
-            // Только активные привычки
-            if (habit.status.value != 0) return@filter false
+            // Фильтр только активных привычек (status.value == 0 означает активную привычку)
+            if (habit.status.value != 0) {
+                Log.d(TAG, "Привычка ${habit.title} пропускается: не активна (статус ${habit.status.value})")
+                return@filter false
+            }
 
-            // Проверка по расписанию
-            val frequency = habit.frequency ?: return@filter true
+            // Проверка по расписанию - получаем частоту из репозитория
+            val frequency = habitRepository.getHabitFrequency(habit.id) ?: return@filter true
 
-            when (frequency.type.value) {
+            val shouldBeShown = when (frequency.type.value) {
                 0 -> true // Ежедневная привычка
                 1 -> { // Привычка по конкретным дням недели
-                    frequency.daysOfWeek?.contains(dayOfWeek) ?: false
+                    val daysOfWeek = frequency.daysOfWeek
+                    val result = daysOfWeek?.contains(dayOfWeek) ?: false
+                    Log.d(TAG, "Привычка ${habit.title} по дням недели $daysOfWeek, день $dayOfWeek: $result")
+                    result
                 }
                 2, 3 -> { // X раз в неделю/месяц - показываем каждый день для простоты
                     true
                 }
-                else -> false
+                else -> {
+                    Log.d(TAG, "Привычка ${habit.title} с неизвестным типом частоты ${frequency.type.value}")
+                    false
+                }
             }
+
+            Log.d(TAG, "Привычка ${habit.title} должна отображаться: $shouldBeShown")
+            shouldBeShown
         }
     }
 
@@ -173,13 +320,14 @@ class DashboardViewModel @Inject constructor(
 
 // Состояние UI для экрана Dashboard
 data class DashboardState(
-    val isLoading: Boolean = false,
-    val userData: UserData? = null,
+    val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
     val todayTasks: List<Task> = emptyList(),
     val todayHabits: List<Habit> = emptyList(),
     val completedTasks: Int = 0,
     val totalTasks: Int = 0,
     val completedHabits: Int = 0,
     val totalHabits: Int = 0,
-    val error: String? = null
+    val userData: UserData? = null
 )
