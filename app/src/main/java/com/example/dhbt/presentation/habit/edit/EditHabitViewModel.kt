@@ -16,12 +16,14 @@ import com.example.dhbt.domain.repository.CategoryRepository
 import com.example.dhbt.domain.repository.HabitRepository
 import com.example.dhbt.domain.repository.TagRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.util.UUID
@@ -36,47 +38,28 @@ class EditHabitViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val habitId: String? = savedStateHandle["habitId"]
-    private val isEditMode = habitId != null
+    val isCreationMode: Boolean = habitId == null
 
-    // UI состояния и потоки
     private val _uiState = MutableStateFlow(EditHabitUiState())
-    val uiState = _uiState.asStateFlow()
-
-    private val _categories = MutableStateFlow<List<Category>>(emptyList())
-    val categories = _categories.asStateFlow()
-
-    private val _tags = MutableStateFlow<List<Tag>>(emptyList())
-    val tags = _tags.asStateFlow()
+    val uiState: StateFlow<EditHabitUiState> = _uiState.asStateFlow()
 
     private val _validationState = MutableStateFlow(EditHabitValidationState())
-    val validationState = _validationState.asStateFlow()
+    val validationState: StateFlow<EditHabitValidationState> = _validationState.asStateFlow()
 
     private val _saveResult = MutableStateFlow<SaveResult?>(null)
-    val saveResult = _saveResult.asStateFlow()
+    val saveResult: StateFlow<SaveResult?> = _saveResult.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    val categories: StateFlow<List<Category>> = _categories.asStateFlow()
+
+    private val _tags = MutableStateFlow<List<Tag>>(emptyList())
+    val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
+
+    private val _events = MutableSharedFlow<EditHabitOneTimeEvent>()
+    val events: SharedFlow<EditHabitOneTimeEvent> = _events
 
     init {
-        Timber.d("Инициализация EditHabitViewModel с habitId: $habitId")
-        loadCategories()
-        loadTags()
-
-        if (isEditMode) {
-            loadHabit(habitId!!)
-        } else {
-            // Значения по умолчанию для новой привычки
-            _uiState.update { state ->
-                state.copy(
-                    habitType = HabitType.BINARY,
-                    frequencyType = FrequencyType.DAILY,
-                    status = HabitStatus.ACTIVE,
-                    selectedColor = "#FF6200EE",
-                    selectedDaysOfWeek = setOf(
-                        DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY, DayOfWeek.FRIDAY
-                    ),
-                    reminderTime = LocalTime.of(9, 0)
-                )
-            }
-        }
+        loadInitialData()
     }
 
     fun onEvent(event: EditHabitEvent) {
@@ -105,23 +88,59 @@ class EditHabitViewModel @Inject constructor(
         }
     }
 
+    fun resetSaveResult() {
+        _saveResult.value = null
+    }
+
+    private fun loadInitialData() {
+        viewModelScope.launch {
+            try {
+                launch { loadCategories() }
+                launch { loadTags() }
+
+                if (!isCreationMode) {
+                    habitId?.let { loadHabit(it) }
+                } else {
+                    setDefaultValues()
+                }
+            } catch (e: Exception) {
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to load data: ${e.localizedMessage}"))
+            }
+        }
+    }
+
+    private fun setDefaultValues() {
+        _uiState.update { state ->
+            state.copy(
+                habitType = HabitType.BINARY,
+                frequencyType = FrequencyType.DAILY,
+                status = HabitStatus.ACTIVE,
+                selectedColor = "#FF6200EE",
+                selectedDaysOfWeek = setOf(
+                    DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                    DayOfWeek.THURSDAY, DayOfWeek.FRIDAY
+                ),
+                reminderTime = LocalTime.of(9, 0),
+                targetValue = 1f,
+                timesPerPeriod = 1,
+                periodType = PeriodType.WEEK
+            )
+        }
+    }
+
     private fun loadHabit(id: String) {
         viewModelScope.launch {
             try {
-                // Получаем привычку вместе с частотой
                 val (habit, frequency) = habitRepository.getHabitWithFrequency(id)
 
-                // Преобразование дней недели из Int в DayOfWeek
                 val daysOfWeek = frequency?.daysOfWeek?.mapNotNull { dayValue ->
                     try {
                         DayOfWeek.of(dayValue)
                     } catch (e: Exception) {
-                        Timber.e(e, "Ошибка при преобразовании дня недели: $dayValue")
                         null
                     }
                 }?.toSet() ?: emptySet()
 
-                // Загружаем теги для привычки
                 val habitTags = tagRepository.getTagsForTask(id).first()
 
                 _uiState.update { state ->
@@ -145,22 +164,24 @@ class EditHabitViewModel @Inject constructor(
                         bestStreak = habit.bestStreak
                     )
                 }
+
+                validateForm()
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при загрузке привычки")
-                _saveResult.value = SaveResult.Error("Ошибка при загрузке привычки: ${e.message}")
+                _saveResult.value = SaveResult.Error("Error loading habit: ${e.localizedMessage}")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to load habit: ${e.localizedMessage}"))
             }
         }
     }
+
     private fun loadCategories() {
         viewModelScope.launch {
             try {
                 categoryRepository.getCategoriesByType(CategoryType.HABIT)
                     .collect { habitCategories ->
-                        Timber.d("Загружены категории: ${habitCategories.size}")
                         _categories.value = habitCategories
                     }
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при загрузке категорий")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to load categories"))
             }
         }
     }
@@ -170,11 +191,10 @@ class EditHabitViewModel @Inject constructor(
             try {
                 tagRepository.getAllTags()
                     .collect { allTags ->
-                        Timber.d("Загружены теги: ${allTags.size}")
                         _tags.value = allTags
                     }
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при загрузке тегов")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to load tags"))
             }
         }
     }
@@ -204,25 +224,6 @@ class EditHabitViewModel @Inject constructor(
         _uiState.update { it.copy(categoryId = categoryId) }
     }
 
-    private fun createNewCategory(name: String, color: String) {
-        viewModelScope.launch {
-            try {
-                val newCategory = Category(
-                    id = UUID.randomUUID().toString(),
-                    name = name,
-                    color = color,
-                    type = CategoryType.HABIT
-                )
-                Timber.d("Создание новой категории: $newCategory")
-                val categoryId = categoryRepository.addCategory(newCategory)
-                updateCategory(categoryId)
-            } catch (e: Exception) {
-                Timber.e(e, "Ошибка при создании категории")
-                _saveResult.value = SaveResult.Error("Ошибка при создании категории: ${e.message}")
-            }
-        }
-    }
-
     private fun updateFrequencyType(type: FrequencyType) {
         _uiState.update { it.copy(frequencyType = type) }
     }
@@ -232,7 +233,7 @@ class EditHabitViewModel @Inject constructor(
     }
 
     private fun updateTimesPerPeriod(times: Int) {
-        _uiState.update { it.copy(timesPerPeriod = times) }
+        _uiState.update { it.copy(timesPerPeriod = times.coerceAtLeast(1)) }
     }
 
     private fun updatePeriodType(type: PeriodType) {
@@ -240,7 +241,7 @@ class EditHabitViewModel @Inject constructor(
     }
 
     private fun updateTargetValue(value: Float) {
-        _uiState.update { it.copy(targetValue = value) }
+        _uiState.update { it.copy(targetValue = value.coerceAtLeast(0.1f)) }
     }
 
     private fun updateUnitOfMeasurement(unit: String) {
@@ -248,7 +249,7 @@ class EditHabitViewModel @Inject constructor(
     }
 
     private fun updateTargetStreak(streak: Int) {
-        _uiState.update { it.copy(targetStreak = streak) }
+        _uiState.update { it.copy(targetStreak = streak.coerceAtLeast(0)) }
     }
 
     private fun updateReminderEnabled(enabled: Boolean) {
@@ -267,7 +268,35 @@ class EditHabitViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTagIds = tagIds) }
     }
 
+    private fun createNewCategory(name: String, color: String) {
+        if (name.isBlank()) {
+            emitEvent(EditHabitOneTimeEvent.Error("Category name cannot be empty"))
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val newCategory = Category(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    color = color,
+                    type = CategoryType.HABIT
+                )
+                val categoryId = categoryRepository.addCategory(newCategory)
+                updateCategory(categoryId)
+                emitEvent(EditHabitOneTimeEvent.CategoryCreated("Category created: $name"))
+            } catch (e: Exception) {
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to create category: ${e.localizedMessage}"))
+            }
+        }
+    }
+
     private fun createNewTag(name: String, color: String) {
+        if (name.isBlank()) {
+            emitEvent(EditHabitOneTimeEvent.Error("Tag name cannot be empty"))
+            return
+        }
+
         viewModelScope.launch {
             try {
                 val newTag = Tag(
@@ -275,20 +304,22 @@ class EditHabitViewModel @Inject constructor(
                     name = name,
                     color = color
                 )
-                Timber.d("Создание нового тега: $newTag")
                 val tagId = tagRepository.addTag(newTag)
-                // Добавляем новый тег к выбранным
                 val updatedTags = _uiState.value.selectedTagIds + tagId
                 updateTags(updatedTags)
+                emitEvent(EditHabitOneTimeEvent.TagCreated("Tag created: $name"))
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при создании тега")
-                _saveResult.value = SaveResult.Error("Ошибка при создании тега: ${e.message}")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to create tag: ${e.localizedMessage}"))
             }
         }
     }
 
     private fun validateForm(): Boolean {
-        val titleError = if (_uiState.value.title.isBlank()) "Название не может быть пустым" else null
+        val titleError = when {
+            _uiState.value.title.isBlank() -> "Название не может быть пустым"
+            _uiState.value.title.length > 50 -> "Название слишком длинное (максимум 50 символов)"
+            else -> null
+        }
 
         val isValid = titleError == null
 
@@ -304,40 +335,34 @@ class EditHabitViewModel @Inject constructor(
 
     private fun saveHabit() {
         if (!validateForm()) {
-            Timber.w("Форма не прошла валидацию. Прерываем сохранение.")
-            _saveResult.value = SaveResult.Error("Заполните все обязательные поля")
+            _saveResult.value = SaveResult.Error("Please fill in all required fields")
             return
         }
 
         viewModelScope.launch {
             try {
                 val state = _uiState.value
-                Timber.d("Начало сохранения привычки. Данные: title=${state.title}, type=${state.habitType}")
-
-                // Генерируем или используем существующий ID
                 val newHabitId = habitId ?: UUID.randomUUID().toString()
 
-                // 1. Создаем привычку
                 val habit = Habit(
                     id = newHabitId,
                     title = state.title,
                     description = state.description.takeIf { it.isNotEmpty() },
                     iconEmoji = state.iconEmoji.takeIf { it.isNotEmpty() },
                     color = state.selectedColor,
-                    creationDate = System.currentTimeMillis(),
+                    creationDate = if (isCreationMode) System.currentTimeMillis()
+                    else uiState.value.creationDate ?: System.currentTimeMillis(),
                     type = state.habitType,
                     targetValue = if (state.habitType != HabitType.BINARY) state.targetValue else null,
-                    unitOfMeasurement = if (state.habitType == HabitType.QUANTITY) state.unitOfMeasurement else null,
+                    unitOfMeasurement = if (state.habitType == HabitType.QUANTITY) state.unitOfMeasurement.takeIf { it.isNotEmpty() } else null,
                     targetStreak = state.targetStreak.takeIf { it > 0 },
-                    currentStreak = if (isEditMode) uiState.value.currentStreak else 0,
-                    bestStreak = if (isEditMode) uiState.value.bestStreak else 0,
+                    currentStreak = if (isCreationMode) 0 else uiState.value.currentStreak,
+                    bestStreak = if (isCreationMode) 0 else uiState.value.bestStreak,
                     status = state.status,
                     categoryId = state.categoryId,
                 )
 
-                // 2. Создаем частоту
                 val daysOfWeek = state.selectedDaysOfWeek.map { it.value }
-                Timber.d("Дни недели для сохранения: $daysOfWeek")
 
                 val habitFrequency = HabitFrequency(
                     id = UUID.randomUUID().toString(),
@@ -354,47 +379,47 @@ class EditHabitViewModel @Inject constructor(
                     else null
                 )
 
-                // 3. Сохраняем всё в одной транзакции
-                if (isEditMode) {
-                    Timber.d("Обновление существующей привычки: $newHabitId")
+                if (isCreationMode) {
+                    habitRepository.addHabit(habit)
+                    habitRepository.setHabitFrequency(newHabitId, habitFrequency)
+                    _saveResult.value = SaveResult.Success
+                    emitEvent(EditHabitOneTimeEvent.HabitCreated("Habit created successfully"))
+                } else {
                     habitRepository.updateHabit(habit)
                     habitRepository.setHabitFrequency(newHabitId, habitFrequency)
-                } else {
-                    Timber.d("Создание новой привычки: $newHabitId")
-                    // Используем новый метод для транзакционного сохранения
-                    val result = habitRepository.addHabit(habit)
-                    habitRepository.setHabitFrequency(newHabitId, habitFrequency)
-                    Timber.d("Результат сохранения привычки: $result")
+                    _saveResult.value = SaveResult.Success
+                    emitEvent(EditHabitOneTimeEvent.HabitUpdated("Habit updated successfully"))
                 }
 
-                _saveResult.value = SaveResult.Success
-                Timber.d("Привычка и частота успешно сохранены")
-
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при сохранении привычки")
-                _saveResult.value = SaveResult.Error("Ошибка сохранения: ${e.message}")
+                _saveResult.value = SaveResult.Error("Error saving: ${e.localizedMessage}")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to save habit: ${e.localizedMessage}"))
             }
         }
     }
 
     private fun deleteHabit() {
-        if (!isEditMode || habitId == null) return
+        if (isCreationMode || habitId == null) {
+            emitEvent(EditHabitOneTimeEvent.Error("Cannot delete a habit that hasn't been saved"))
+            return
+        }
 
         viewModelScope.launch {
             try {
-                Timber.d("Удаление привычки: $habitId")
                 habitRepository.deleteHabit(habitId)
                 _saveResult.value = SaveResult.Deleted
+                emitEvent(EditHabitOneTimeEvent.HabitDeleted("Habit deleted successfully"))
             } catch (e: Exception) {
-                Timber.e(e, "Ошибка при удалении привычки")
-                _saveResult.value = SaveResult.Error(e.message ?: "Ошибка при удалении")
+                _saveResult.value = SaveResult.Error("Error deleting: ${e.localizedMessage}")
+                emitEvent(EditHabitOneTimeEvent.Error("Failed to delete habit: ${e.localizedMessage}"))
             }
         }
     }
 
-    // Сбрасываем состояние сохранения при навигации
-    fun resetSaveResult() {
-        _saveResult.value = null
+    private fun emitEvent(event: EditHabitOneTimeEvent) {
+        viewModelScope.launch {
+            _events.emit(event)
+        }
     }
 }
 
@@ -419,7 +444,7 @@ data class EditHabitUiState(
     val reminderEnabled: Boolean = false,
     val reminderTime: LocalTime = LocalTime.of(9, 0),
     val reminderDays: Set<DayOfWeek> = emptySet(),
-    val endDate: Long? = null
+    val creationDate: Long? = null
 )
 
 data class EditHabitValidationState(
@@ -431,6 +456,15 @@ sealed class SaveResult {
     object Success : SaveResult()
     object Deleted : SaveResult()
     data class Error(val message: String) : SaveResult()
+}
+
+sealed class EditHabitOneTimeEvent {
+    data class HabitCreated(val message: String) : EditHabitOneTimeEvent()
+    data class HabitUpdated(val message: String) : EditHabitOneTimeEvent()
+    data class HabitDeleted(val message: String) : EditHabitOneTimeEvent()
+    data class CategoryCreated(val message: String) : EditHabitOneTimeEvent()
+    data class TagCreated(val message: String) : EditHabitOneTimeEvent()
+    data class Error(val message: String) : EditHabitOneTimeEvent()
 }
 
 sealed class EditHabitEvent {

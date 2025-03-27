@@ -1,9 +1,9 @@
 package com.example.dhbt.presentation.util
 
-import org.threeten.bp.Instant
-import org.threeten.bp.LocalDate
-import org.threeten.bp.LocalTime
-import org.threeten.bp.ZoneId
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 fun Long.toLocalDate(): LocalDate {
     return Instant

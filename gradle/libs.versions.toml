@@ -48,8 +48,6 @@ lottie = "6.6.0"
 coil = "2.7.0"
 mpandroidchart = "v3.1.0"
 
-# Utils
-threetenabp = "1.4.6"
 timber = "5.0.1"
 
 # Testing
@@ -119,7 +117,6 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 mpandroidchart = { module = "com.github.PhilJay:MPAndroidChart", version.ref = "mpandroidchart" }
 
 # Utils
-threetenabp = { module = "com.jakewharton.threetenabp:threetenabp", version.ref = "threetenabp" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
 # Testing

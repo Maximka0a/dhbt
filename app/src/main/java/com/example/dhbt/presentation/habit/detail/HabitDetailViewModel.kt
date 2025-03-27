@@ -11,10 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
-import org.threeten.bp.format.DateTimeFormatter
-import org.threeten.bp.temporal.ChronoUnit
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
 import java.util.*
 import javax.inject.Inject
 
@@ -26,7 +26,8 @@ class HabitDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val habitId: String = checkNotNull(savedStateHandle["habitId"])
+    private val habitId: String? = savedStateHandle["habitId"]
+    val isCreationMode = habitId == null
 
     // Состояние UI
     private val _uiState = MutableStateFlow(HabitDetailUiState())
@@ -110,7 +111,7 @@ class HabitDetailViewModel @Inject constructor(
     private fun loadHabit() {
         viewModelScope.launch {
             try {
-                val habit = habitRepository.getHabitById(habitId)
+                val habit = habitRepository.getHabitById(habitId.toString())
                 _habit.value = habit
 
                 // Загружаем связанную категорию, если она есть
@@ -119,7 +120,7 @@ class HabitDetailViewModel @Inject constructor(
                 }
 
                 // Загружаем связанные теги (предполагая, что API такой же для привычек)
-                _tags.value = tagRepository.getTagsForTask(habitId).first()
+                _tags.value = tagRepository.getTagsForTask(habitId.toString()).first()
 
                 _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
@@ -141,7 +142,7 @@ class HabitDetailViewModel @Inject constructor(
             val startDate = thirtyDaysAgo.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             val endDate = now.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-            habitRepository.getHabitTrackingsForRange(habitId, startDate, endDate)
+            habitRepository.getHabitTrackingsForRange(habitId.toString(), startDate, endDate)
                 .collect { trackings ->
                     _trackingHistory.value = trackings
                     calculateCalendarData()
@@ -212,12 +213,14 @@ class HabitDetailViewModel @Inject constructor(
             HabitType.QUANTITY -> {
                 val value = tracking.value ?: 0f
                 val target = habit.targetValue ?: 1f
-                (value / target).coerceIn(0f, 1f)
+                // Remove coerceIn to allow values > 1.0
+                value / target
             }
             HabitType.TIME -> {
                 val duration = tracking.duration?.toFloat() ?: 0f
                 val target = habit.targetValue ?: 1f
-                (duration / target).coerceIn(0f, 1f)
+                // Remove coerceIn to allow values > 1.0
+                duration / target
             }
         }
     }
@@ -226,7 +229,7 @@ class HabitDetailViewModel @Inject constructor(
         val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId, today)
+            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
             val habit = _habit.value ?: return@launch
 
             if (todayTracking == null) {
@@ -247,13 +250,15 @@ class HabitDetailViewModel @Inject constructor(
                     val value = todayTracking.value ?: 0f
                     val target = habit.targetValue ?: 1f
                     _todayValue.value = value
-                    _todayProgress.value = (value / target).coerceIn(0f, 1f)
+                    // Remove the coerceIn to allow progress > 1.0
+                    _todayProgress.value = value / target
                 }
                 HabitType.TIME -> {
                     val duration = todayTracking.duration?.toFloat() ?: 0f
                     val target = habit.targetValue ?: 1f
                     _todayValue.value = duration
-                    _todayProgress.value = (duration / target).coerceIn(0f, 1f)
+                    // Remove the coerceIn to allow progress > 1.0
+                    _todayProgress.value = duration / target
                 }
             }
         }
@@ -261,7 +266,8 @@ class HabitDetailViewModel @Inject constructor(
 
     private fun incrementProgress() {
         viewModelScope.launch {
-            habitRepository.incrementHabitProgress(habitId)
+            val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            habitRepository.incrementHabitProgress(habitId.toString(), today)
             updateTodayProgress()
             loadTrackingData()
             _events.emit(HabitDetailEvent.ProgressUpdated("Прогресс увеличен"))
@@ -273,7 +279,7 @@ class HabitDetailViewModel @Inject constructor(
         val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId, today)
+            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
 
             if (todayTracking == null) return@launch
 
@@ -321,7 +327,7 @@ class HabitDetailViewModel @Inject constructor(
         val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId, today)
+            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
 
             if (todayTracking != null) {
                 // Переключаем существующую запись
@@ -331,7 +337,7 @@ class HabitDetailViewModel @Inject constructor(
                 // Создаем новую запись
                 val newTracking = HabitTracking(
                     id = UUID.randomUUID().toString(),
-                    habitId = habitId,
+                    habitId = habitId.toString(),
                     date = today,
                     isCompleted = true
                 )
@@ -355,7 +361,7 @@ class HabitDetailViewModel @Inject constructor(
                 HabitStatus.ARCHIVED
             }
 
-            habitRepository.changeHabitStatus(habitId, newStatus)
+            habitRepository.changeHabitStatus(habitId.toString(), newStatus)
 
             _habit.value = _habit.value?.copy(status = newStatus)
 
@@ -387,7 +393,7 @@ class HabitDetailViewModel @Inject constructor(
     private fun deleteHabit() {
         viewModelScope.launch {
             try {
-                habitRepository.deleteHabit(habitId)
+                habitRepository.deleteHabit(habitId.toString())
                 _events.emit(HabitDetailEvent.HabitDeleted)
             } catch (e: Exception) {
                 _events.emit(HabitDetailEvent.Error("Не удалось удалить привычку: ${e.localizedMessage}"))
@@ -412,8 +418,8 @@ class HabitDetailViewModel @Inject constructor(
                 val days = frequency.daysOfWeek ?: return "По дням недели"
                 val dayNames = days.map { dayNumber ->
                     try {
-                        val day = org.threeten.bp.DayOfWeek.of(dayNumber)
-                        day.getDisplayName(org.threeten.bp.format.TextStyle.SHORT, Locale.getDefault())
+                        val day = DayOfWeek.of(dayNumber)
+                        day.getDisplayName(TextStyle.SHORT, Locale.getDefault())
                     } catch (e: Exception) {
                         "$dayNumber"
                     }
@@ -460,10 +466,12 @@ class HabitDetailViewModel @Inject constructor(
             HabitType.QUANTITY -> {
                 val target = habit.targetValue ?: 1f
                 val unit = habit.unitOfMeasurement ?: "раз"
+                // Here we show the actual value, not capped at the target
                 "$todayValue / $target $unit"
             }
             HabitType.TIME -> {
                 val target = habit.targetValue?.toInt() ?: 1
+                // Here we show the actual value, not capped at the target
                 "$todayValue / $target минут"
             }
         }

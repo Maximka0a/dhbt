@@ -1,5 +1,7 @@
 package com.example.dhbt.presentation.task.list
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dhbt.domain.model.Category
@@ -15,9 +17,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -164,6 +167,7 @@ class TasksViewModel @Inject constructor(
     }
 
     // Обновление состояния календаря - находим даты с задачами
+// In your TasksViewModel.kt
     private fun updateDatesWithTasks(tasks: List<Task>) {
         val dates = tasks
             .mapNotNull { task -> task.dueDate }
@@ -289,18 +293,6 @@ class TasksViewModel @Inject constructor(
     }
 }
 
-// Состояние фильтрации задач
-data class TaskFilterState(
-    val selectedDate: LocalDate? = null,
-    val selectedCategoryId: String? = null,
-    val selectedPriority: TaskPriority? = null,
-    val selectedStatus: TaskStatus? = null,
-    val selectedTagIds: List<String> = emptyList(),
-    val searchQuery: String = "",
-    val sortOption: SortOption = SortOption.DATE_ASC,
-    val showEisenhowerMatrix: Boolean = false
-)
-
 // Состояние экрана задач
 data class TasksState(
     val isLoading: Boolean = true,
@@ -309,12 +301,23 @@ data class TasksState(
     val isCalendarExpanded: Boolean = false
 )
 
-// Опции сортировки задач
+
+data class TaskFilterState(
+    val searchQuery: String = "",
+    val selectedDate: LocalDate? = null,
+    val selectedCategoryId: String? = null,
+    val selectedTagIds: List<String> = emptyList(),
+    val selectedStatus: TaskStatus? = null,
+    val selectedPriority: TaskPriority? = null,
+    val sortOption: SortOption = SortOption.DATE_ASC,
+    val showEisenhowerMatrix: Boolean = false
+)
+
 enum class SortOption {
-    DATE_ASC, // По дате (возрастание)
-    DATE_DESC, // По дате (убывание)
-    PRIORITY_HIGH, // По приоритету (высокий → низкий)
-    PRIORITY_LOW, // По приоритету (низкий → высокий)
-    ALPHABETICAL, // По алфавиту
-    CREATION_DATE // По дате создания
+    DATE_ASC,
+    DATE_DESC,
+    PRIORITY_HIGH,
+    PRIORITY_LOW,
+    ALPHABETICAL,
+    CREATION_DATE
 }

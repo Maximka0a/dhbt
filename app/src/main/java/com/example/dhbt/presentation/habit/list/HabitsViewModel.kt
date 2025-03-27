@@ -9,8 +9,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 import javax.inject.Inject
 
@@ -38,6 +40,12 @@ class HabitsViewModel @Inject constructor(
     // Выбранная дата
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate = _selectedDate.asStateFlow()
+
+    // Начало текущей недели (needed for weekly navigation)
+    private val _weekStartDate = MutableStateFlow(
+        LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    )
+    val weekStartDate = _weekStartDate.asStateFlow()
 
     // Общий прогресс привычек на выбранную дату
     private val _overallProgress = MutableStateFlow(0f)
@@ -111,11 +119,25 @@ class HabitsViewModel @Inject constructor(
                     val progress = habitRepository.calculateHabitProgress(habit.id, dateMillis)
                     val tracking = habitRepository.getHabitTrackingForDate(habit.id, dateMillis)
 
+                    // Загружаем завершенные даты для этой привычки
+                    // за последние 7 дней (или другой период по вашему выбору)
+                    val today = LocalDate.now()
+                    val dateRange = (-2..4).map { today.plusDays(it.toLong()) }
+
+                    val completedDates = dateRange.filter { date ->
+                        val dateMills = date.atStartOfDay(ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
+                        val trackingForDate = habitRepository.getHabitTrackingForDate(habit.id, dateMills)
+                        trackingForDate?.isCompleted == true
+                    }.toSet()
+
                     HabitWithProgress(
                         habit = habit,
                         currentProgress = progress,
                         todayTracking = tracking,
-                        isCompletedToday = tracking?.isCompleted ?: false
+                        isCompletedToday = tracking?.isCompleted ?: false,
+                        completedDates = completedDates
                     )
                 }
 
@@ -172,6 +194,10 @@ class HabitsViewModel @Inject constructor(
             is HabitsIntent.IncrementHabitProgress -> incrementHabitProgress(intent.habitId)
             is HabitsIntent.DecrementHabitProgress -> decrementHabitProgress(intent.habitId)
             is HabitsIntent.ArchiveHabit -> archiveHabit(intent.habitId)
+            // Add new navigation intents
+            is HabitsIntent.NavigateToPreviousWeek -> navigateToPreviousWeek()
+            is HabitsIntent.NavigateToNextWeek -> navigateToNextWeek()
+            is HabitsIntent.JumpToCurrentWeek -> jumpToCurrentWeek()
         }
     }
 
@@ -189,6 +215,16 @@ class HabitsViewModel @Inject constructor(
 
     private fun setSelectedDate(date: LocalDate) {
         _selectedDate.value = date
+
+        // Check if the selected date is outside the current displayed week
+        val currentWeekStart = _weekStartDate.value
+        val currentWeekEnd = currentWeekStart.plusDays(6)
+
+        if (date.isBefore(currentWeekStart) || date.isAfter(currentWeekEnd)) {
+            // Adjust the week to include the selected date
+            _weekStartDate.value = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        }
+
         refreshHabitsForSelectedDate()
     }
 
@@ -202,6 +238,34 @@ class HabitsViewModel @Inject constructor(
 
     private fun clearFilters() {
         _filterState.value = HabitsFilterState()
+    }
+
+    /**
+     * Перемещается на предыдущую неделю
+     */
+    private fun navigateToPreviousWeek() {
+        _weekStartDate.value = _weekStartDate.value.minusWeeks(1)
+        _selectedDate.value = _weekStartDate.value
+        refreshHabitsForSelectedDate()
+    }
+
+    /**
+     * Перемещается на следующую неделю
+     */
+    private fun navigateToNextWeek() {
+        _weekStartDate.value = _weekStartDate.value.plusWeeks(1)
+        _selectedDate.value = _weekStartDate.value
+        refreshHabitsForSelectedDate()
+    }
+
+    /**
+     * Переходит к текущей неделе
+     */
+    private fun jumpToCurrentWeek() {
+        val today = LocalDate.now()
+        _weekStartDate.value = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        _selectedDate.value = today
+        refreshHabitsForSelectedDate()
     }
 
     /**
@@ -246,14 +310,16 @@ class HabitsViewModel @Inject constructor(
      */
     private fun incrementHabitProgress(habitId: String) {
         viewModelScope.launch {
-            habitRepository.incrementHabitProgress(habitId)
+            val dateMillis = _selectedDate.value
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+
+            habitRepository.incrementHabitProgress(habitId, dateMillis)
             refreshHabitsForSelectedDate()
         }
     }
 
-    /**
-     * Уменьшает прогресс привычки (только для количественных и временных типов)
-     */
     private fun decrementHabitProgress(habitId: String) {
         viewModelScope.launch {
             val dateMillis = _selectedDate.value
@@ -261,44 +327,7 @@ class HabitsViewModel @Inject constructor(
                 .toInstant()
                 .toEpochMilli()
 
-            val tracking = habitRepository.getHabitTrackingForDate(habitId, dateMillis)
-            val habit = habitRepository.getHabitById(habitId) ?: return@launch
-
-            if (tracking != null) {
-                when (habit.type) {
-                    HabitType.QUANTITY -> {
-                        val currentValue = tracking.value ?: 0f
-                        if (currentValue > 0) {
-                            val newValue = currentValue - 1
-                            val targetValue = habit.targetValue ?: 1f
-                            val isCompleted = newValue >= targetValue
-
-                            val updatedTracking = tracking.copy(
-                                value = newValue,
-                                isCompleted = isCompleted
-                            )
-                            habitRepository.updateHabitTracking(updatedTracking)
-                        }
-                    }
-                    HabitType.TIME -> {
-                        val currentDuration = tracking.duration ?: 0
-                        if (currentDuration > 0) {
-                            val newDuration = currentDuration - 1
-                            val targetDuration = habit.targetValue?.toInt() ?: 1
-                            val isCompleted = newDuration >= targetDuration
-
-                            val updatedTracking = tracking.copy(
-                                duration = newDuration,
-                                isCompleted = isCompleted
-                            )
-                            habitRepository.updateHabitTracking(updatedTracking)
-                        }
-                    }
-                    else -> {} // Для бинарных привычек уменьшение не имеет смысла
-                }
-            }
-
-            // Обновляем данные
+            habitRepository.decrementHabitProgress(habitId, dateMillis)
             refreshHabitsForSelectedDate()
         }
     }
@@ -346,7 +375,6 @@ class HabitsViewModel @Inject constructor(
         }
     }
 }
-
 // Классы состояний UI и намерений
 data class HabitsUiState(
     val isLoading: Boolean = false,
@@ -365,13 +393,17 @@ data class HabitWithProgress(
     val habit: Habit,
     val currentProgress: Float = 0f,
     val todayTracking: HabitTracking? = null,
-    val isCompletedToday: Boolean = false
+    val isCompletedToday: Boolean = false,
+    val completedDates: Set<LocalDate> = emptySet() // Добавляем это свойство
 )
 
 // Настройки отображения
 enum class HabitViewMode {
     LIST, GRID, CATEGORIES
 }
+
+
+
 
 // Фильтры по статусу
 enum class HabitStatusFilter {
@@ -399,4 +431,8 @@ sealed class HabitsIntent {
     data class IncrementHabitProgress(val habitId: String) : HabitsIntent()
     data class DecrementHabitProgress(val habitId: String) : HabitsIntent()
     data class ArchiveHabit(val habitId: String) : HabitsIntent()
+    // Add new navigation intents
+    object NavigateToPreviousWeek : HabitsIntent()
+    object NavigateToNextWeek : HabitsIntent()
+    object JumpToCurrentWeek : HabitsIntent()
 }

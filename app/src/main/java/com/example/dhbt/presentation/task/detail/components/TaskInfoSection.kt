@@ -22,10 +22,8 @@ import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.presentation.task.edit.components.parseColor
 import com.example.dhbt.presentation.util.toLocalDate
 import com.example.dhbt.presentation.util.toLocalTime
-import org.threeten.bp.Instant
-import org.threeten.bp.ZoneId
-import org.threeten.bp.format.DateTimeFormatter
-import org.threeten.bp.format.FormatStyle
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.*
 
 @Composable

@@ -15,9 +15,9 @@ import com.example.dhbt.domain.model.HabitType
 import com.example.dhbt.domain.repository.HabitRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
 import timber.log.Timber
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 
@@ -188,6 +188,7 @@ class HabitRepositoryImpl @Inject constructor(
 
     override suspend fun getHabitProgressForToday(habitId: String): Float {
         // Используем timestamp для сегодняшнего дня вместо строки
+
         val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         val tracking = habitTrackingDao.getHabitTrackingForDate(
@@ -218,16 +219,12 @@ class HabitRepositoryImpl @Inject constructor(
         return trackings.associate { it.habitId to (it.value ?: 0f) }
     }
 
-    // Добавляем реализацию метода incrementHabitProgress
-    override suspend fun incrementHabitProgress(habitId: String) {
+    override suspend fun incrementHabitProgress(habitId: String, dateMillis: Long) {
         // Получаем привычку
         val habit = getHabitById(habitId) ?: return
 
-        // Получаем текущую дату
-        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-        // Проверяем, есть ли уже запись за сегодняшний день
-        val existingTracking = getHabitTrackingForDate(habitId, today)
+        // Проверяем, есть ли уже запись за выбранный день
+        val existingTracking = getHabitTrackingForDate(habitId, dateMillis)
 
         if (existingTracking != null) {
             // Обновляем существующую запись
@@ -255,9 +252,9 @@ class HabitRepositoryImpl @Inject constructor(
                 }
 
                 HabitType.TIME -> {
-                    // Для времени увеличиваем на 1 минуту (или другую логику)
+                    // Для времени увеличиваем на 1 минуту
                     val currentDuration = existingTracking.duration ?: 0
-                    val newDuration = currentDuration + 1 // Предположим, +1 минута
+                    val newDuration = currentDuration + 1
                     val targetDuration = habit.targetValue?.toInt() ?: 1
                     val isCompleted = newDuration >= targetDuration
 
@@ -269,7 +266,7 @@ class HabitRepositoryImpl @Inject constructor(
                 }
             }
         } else {
-            // Создаем новую запись
+            // Создаем новую запись с начальным значением 1 (не с целевым значением)
             val isCompleted = when (habit.type) {
                 HabitType.BINARY -> true
                 HabitType.QUANTITY -> 1f >= (habit.targetValue ?: 1f)
@@ -282,7 +279,7 @@ class HabitRepositoryImpl @Inject constructor(
             val tracking = HabitTracking(
                 id = UUID.randomUUID().toString(),
                 habitId = habitId,
-                date = today,
+                date = dateMillis,  // Use the provided date
                 isCompleted = isCompleted,
                 value = value,
                 duration = duration
@@ -290,6 +287,49 @@ class HabitRepositoryImpl @Inject constructor(
 
             trackHabit(tracking)
         }
+    }
+
+    override suspend fun decrementHabitProgress(habitId: String, dateMillis: Long) {
+        // Получаем привычку
+        val habit = getHabitById(habitId) ?: return
+
+        // Проверяем, есть ли запись за выбранный день
+        val existingTracking = getHabitTrackingForDate(habitId, dateMillis)
+
+        if (existingTracking != null) {
+            when (habit.type) {
+                HabitType.QUANTITY -> {
+                    val currentValue = existingTracking.value ?: 0f
+                    if (currentValue > 0) {
+                        val newValue = currentValue - 1
+                        val targetValue = habit.targetValue ?: 1f
+                        val isCompleted = newValue >= targetValue
+
+                        val updatedTracking = existingTracking.copy(
+                            value = newValue,
+                            isCompleted = isCompleted
+                        )
+                        updateHabitTracking(updatedTracking)
+                    }
+                }
+                HabitType.TIME -> {
+                    val currentDuration = existingTracking.duration ?: 0
+                    if (currentDuration > 0) {
+                        val newDuration = currentDuration - 1
+                        val targetDuration = habit.targetValue?.toInt() ?: 1
+                        val isCompleted = newDuration >= targetDuration
+
+                        val updatedTracking = existingTracking.copy(
+                            duration = newDuration,
+                            isCompleted = isCompleted
+                        )
+                        updateHabitTracking(updatedTracking)
+                    }
+                }
+                else -> {} // Для бинарных привычек уменьшение не имеет смысла
+            }
+        }
+        // Если записи нет, то нечего уменьшать
     }
 
 

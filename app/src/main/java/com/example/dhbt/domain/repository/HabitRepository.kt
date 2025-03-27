@@ -13,7 +13,8 @@ interface HabitRepository {
     suspend fun updateHabit(habit: Habit)
     suspend fun deleteHabit(habitId: String)
     suspend fun changeHabitStatus(habitId: String, status: HabitStatus)
-    suspend fun incrementHabitProgress(habitId: String)
+    suspend fun incrementHabitProgress(habitId: String, dateMillis: Long)
+    suspend fun decrementHabitProgress(habitId: String, dateMillis: Long)
 
     // Методы для получения полной информации (привычка + частота)
     suspend fun getHabitWithFrequency(habitId: String): Pair<Habit, HabitFrequency?>

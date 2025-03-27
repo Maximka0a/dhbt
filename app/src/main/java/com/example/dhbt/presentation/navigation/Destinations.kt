@@ -30,7 +30,7 @@ data class TaskEdit(val taskId: String = "")
 data class HabitDetail(val habitId: String)
 
 @Serializable
-data class HabitEdit(val habitId: String = "")
+data class HabitEdit(val habitId: String? = null)
 
 // Маршруты для Pomodoro
 @Serializable

@@ -1,31 +1,32 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.example.dhbt.presentation.habit.detail
 
 import android.content.Intent
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.dhbt.R
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,19 +34,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.dhbt.domain.model.Category
-import com.example.dhbt.domain.model.Habit
-import com.example.dhbt.domain.model.HabitStatus
-import com.example.dhbt.domain.model.HabitType
-import com.example.dhbt.domain.model.Tag
+import com.example.dhbt.domain.model.*
 import com.example.dhbt.presentation.components.ConfirmDeleteDialog
 import com.example.dhbt.presentation.habit.components.CalendarHeatMap
 import com.example.dhbt.presentation.habit.components.StatsBarGraph
 import com.example.dhbt.presentation.navigation.HabitEdit
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.threeten.bp.LocalDate
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,14 +62,24 @@ fun HabitDetailScreen(
     val monthlyCompletion by viewModel.monthlyCompletion.collectAsState()
     val selectedChartPeriod by viewModel.selectedChartPeriod.collectAsState()
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsState()
-    val showMenu by viewModel.showMenu.collectAsState()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    // Получение цвета привычки
+    // Получение цвета привычки с поддержкой темной/светлой темы
     val habitColor = calculateHabitColor(habit)
+
+    // Добавляем состояние для отслеживания анимации FAB
+    var isFabExtended by remember { mutableStateOf(true) }
+
+    // Анимируем видимость FAB при прокрутке
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.isScrollInProgress }
+            .collect { isScrolling ->
+                isFabExtended = !isScrolling
+            }
+    }
 
     // Обработка событий
     LaunchedEffect(Unit) {
@@ -105,87 +112,99 @@ fun HabitDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
-                    Text(
-                        text = habit?.title ?: "Привычка",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column {
+                        Text(
+                            text = habit?.title ?: "Привычка",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                        if (habit?.iconEmoji != null) {
+                            Text(
+                                text = habit?.iconEmoji ?: "",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                ),
                 actions = {
-                    IconButton(onClick = { viewModel.onAction(HabitDetailAction.ShowMenu(true)) }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Меню")
+                    // Кнопка редактирования
+                    IconButton(
+                        onClick = { navController.navigate(HabitEdit(habit?.id ?: "")) }
+                    ) {
+                        Icon(
+                            Icons.Rounded.Edit,
+                            contentDescription = "Редактировать привычку",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
 
-                    // Выпадающее меню
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { viewModel.onAction(HabitDetailAction.ShowMenu(false)) }
+                    // Кнопка удаления
+                    IconButton(
+                        onClick = { viewModel.onAction(HabitDetailAction.ShowDeleteDialog(true)) }
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Редактировать") },
-                            onClick = {
-                                viewModel.onAction(HabitDetailAction.ShowMenu(false))
-                                navController.navigate(HabitEdit(habit?.id ?: ""))
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Edit, contentDescription = null)
-                            }
+                        Icon(
+                            Icons.Rounded.Delete,
+                            contentDescription = "Удалить привычку",
+                            tint = MaterialTheme.colorScheme.error
                         )
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { viewModel.onAction(HabitDetailAction.ToggleCompletion) },
+                containerColor = habitColor,
+                contentColor = MaterialTheme.colorScheme.surface,
+                expanded = isFabExtended,
+                icon = {
+                    val completionIcon = if (todayIsCompleted)
+                        Icons.Rounded.CheckCircle else
+                        Icons.Rounded.RadioButtonUnchecked
 
-                        val isArchived = habit?.status == HabitStatus.ARCHIVED
-                        DropdownMenuItem(
-                            text = { Text(if (isArchived) "Восстановить из архива" else "Архивировать") },
-                            onClick = {
-                                viewModel.onAction(HabitDetailAction.ShowMenu(false))
-                                viewModel.onAction(HabitDetailAction.ArchiveHabit)
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    if (isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text("Поделиться") },
-                            onClick = {
-                                viewModel.onAction(HabitDetailAction.ShowMenu(false))
-                                viewModel.onAction(HabitDetailAction.ShareHabit)
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Share, contentDescription = null)
-                            }
-                        )
-
-                        Divider()
-
-                        DropdownMenuItem(
-                            text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                viewModel.onAction(HabitDetailAction.ShowMenu(false))
-                                viewModel.onAction(HabitDetailAction.ShowDeleteDialog(true))
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                    Icon(
+                        imageVector = completionIcon,
+                        contentDescription = stringResource(R.string.mark_habit)
+                    )
+                },
+                text = {
+                    AnimatedVisibility(
+                        visible = isFabExtended,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally()
+                    ) {
+                        Text(
+                            text = if (todayIsCompleted)
+                                stringResource(R.string.completed)
+                            else
+                                stringResource(R.string.mark),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 4.dp)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                modifier = Modifier.animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
                 )
             )
         }
@@ -205,94 +224,26 @@ fun HabitDetailScreen(
                 }
             } else if (uiState.error != null) {
                 // Отображение ошибки
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    // Исправление: безопасная обработка errorMessage
-                    uiState.error?.let { errorMessage ->
-                        Text(
-                            text = errorMessage,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(onClick = { navController.popBackStack() }) {
-                        Text("Вернуться назад")
-                    }
-                }
+                ErrorState(
+                    errorMessage = uiState.error ?: "Неизвестная ошибка",
+                    onBackClick = { navController.popBackStack() }
+                )
             } else {
                 // Основной контент экрана
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .padding(bottom = 80.dp) // Учитываем размер FAB
-                ) {
-                    // Секция общего вида
-                    HabitGeneralSection(
-                        habitColor = habitColor,
-                        emoji = habit?.iconEmoji ?: "📝",
-                        description = habit?.description,
-                        progress = todayProgress,
-                        isCompleted = todayIsCompleted,
-                        progressText = viewModel.getCurrentProgressText(),
-                        habitType = habit?.type ?: HabitType.BINARY,
-                        onIncrementClick = { viewModel.onAction(HabitDetailAction.IncrementProgress) },
-                        onDecrementClick = { viewModel.onAction(HabitDetailAction.DecrementProgress) }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Секция статистики
-                    HabitStatsSection(
-                        currentStreak = habit?.currentStreak ?: 0,
-                        bestStreak = habit?.bestStreak ?: 0,
-                        calendarData = calendarData,
-                        weeklyData = weeklyCompletion,
-                        monthlyData = monthlyCompletion,
-                        selectedPeriod = selectedChartPeriod,
-                        onPeriodSelected = { viewModel.onAction(HabitDetailAction.SetChartPeriod(it)) },
-                        habitColor = habitColor
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Секция деталей настроек
-                    HabitDetailsSection(
-                        frequencyText = viewModel.getFrequencyText(),
-                        targetValueText = viewModel.getTargetValueText(),
-                        category = category,
-                        tags = tags,
-                        habitColor = habitColor
-                    )
-                }
-
-                // Нижняя кнопка действия
-                FloatingActionButton(
-                    onClick = { viewModel.onAction(HabitDetailAction.ToggleCompletion) },
-                    containerColor = habitColor,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp)
-                ) {
-                    Icon(
-                        imageVector = if (todayIsCompleted) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
-                        contentDescription = "Отметить выполнение"
-                    )
-                }
+                MainContent(
+                    scrollState = scrollState,
+                    habit = habit,
+                    category = category,
+                    tags = tags,
+                    todayProgress = todayProgress,
+                    todayIsCompleted = todayIsCompleted,
+                    calendarData = calendarData,
+                    weeklyCompletion = weeklyCompletion,
+                    monthlyCompletion = monthlyCompletion,
+                    selectedChartPeriod = selectedChartPeriod,
+                    habitColor = habitColor,
+                    viewModel = viewModel
+                )
             }
         }
     }
@@ -308,30 +259,138 @@ fun HabitDetailScreen(
     }
 }
 
-/**
- * Функция для вычисления цвета привычки на основе её настроек
- */
-
 @Composable
-private fun calculateHabitColor(habit: Habit?): Color {
-    return remember(habit) {
-        try {
-            habit?.color?.let { Color(android.graphics.Color.parseColor(it)) }
-        } catch (e: Exception) {
-            Color.Red
-        } ?: Color.Blue
+fun ErrorState(
+    errorMessage: String,
+    onBackClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(80.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Что-то пошло не так",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = errorMessage,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onBackClick,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(
+                Icons.Rounded.ArrowBack,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Вернуться назад")
+        }
     }
 }
 
 @Composable
-fun HabitGeneralSection(
+fun MainContent(
+    scrollState: ScrollState,
+    habit: Habit?,
+    category: Category?,
+    tags: List<Tag>,
+    todayProgress: Float,
+    todayIsCompleted: Boolean,
+    calendarData: Map<LocalDate, Float>,
+    weeklyCompletion: List<Float>,
+    monthlyCompletion: List<Float>,
+    selectedChartPeriod: ChartPeriod,
     habitColor: Color,
-    emoji: String,
-    description: String?,
+    viewModel: HabitDetailViewModel
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = 80.dp) // Пространство для FAB
+    ) {
+        // Карта прогресса и основная информация
+        ProgressSection(
+            progress = todayProgress,
+            isCompleted = todayIsCompleted,
+            habitType = habit?.type ?: HabitType.BINARY,
+            progressText = viewModel.getCurrentProgressText(),
+            description = habit?.description,
+            habitColor = habitColor,
+            onIncrementClick = { viewModel.onAction(HabitDetailAction.IncrementProgress) },
+            onDecrementClick = { viewModel.onAction(HabitDetailAction.DecrementProgress) }
+        )
+
+        // Секция статистики серий
+        StreakSection(
+            currentStreak = habit?.currentStreak ?: 0,
+            bestStreak = habit?.bestStreak ?: 0,
+            habitColor = habitColor
+        )
+
+        // Календарь и график
+        StatsSection(
+            calendarData = calendarData,
+            weeklyData = weeklyCompletion,
+            monthlyData = monthlyCompletion,
+            selectedPeriod = selectedChartPeriod,
+            onPeriodSelected = { viewModel.onAction(HabitDetailAction.SetChartPeriod(it)) },
+            habitColor = habitColor
+        )
+
+        // Информация о настройках
+        DetailsSection(
+            frequencyText = viewModel.getFrequencyText(),
+            targetValueText = viewModel.getTargetValueText(),
+            category = category,
+            tags = tags,
+            habitColor = habitColor
+        )
+
+        // Дополнительные действия
+        ActionsSection(
+            onShareClick = { viewModel.onAction(HabitDetailAction.ShareHabit) },
+            onArchiveClick = { viewModel.onAction(HabitDetailAction.ArchiveHabit) },
+            isArchived = habit?.status == HabitStatus.ARCHIVED
+        )
+    }
+}
+
+@Composable
+fun ProgressSection(
     progress: Float,
     isCompleted: Boolean,
-    progressText: String,
     habitType: HabitType,
+    progressText: String,
+    description: String?,
+    habitColor: Color,
     onIncrementClick: () -> Unit,
     onDecrementClick: () -> Unit
 ) {
@@ -339,155 +398,244 @@ fun HabitGeneralSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(24.dp)
         ) {
-            // Верхняя часть с эмоджи и описанием
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            // Прогресс
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(150.dp)
+                    .padding(8.dp)
             ) {
-                // Эмоджи в цветном круге
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(habitColor.copy(alpha = 0.2f))
-                        .border(2.dp, habitColor, CircleShape)
+                // Анимированный прогресс
+                val animatedProgress = animateFloatAsState(
+                    targetValue = progress.coerceIn(0f, 1f), // Cap at 1.0 for visual indicator
+                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                    label = "ProgressAnimation"
+                )
+
+
+                // Фоновый индикатор
+                CircularProgressIndicator(
+                    progress = 1f,
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 16.dp,
+                    strokeCap = StrokeCap.Round
+                )
+
+                // Прогресс пользователя
+                CircularProgressIndicator(
+                    progress = { animatedProgress.value },
+                    modifier = Modifier.fillMaxSize(),
+                    color = habitColor,
+                    strokeWidth = 16.dp,
+                    strokeCap = StrokeCap.Round
+                )
+
+                // Текст внутри индикатора
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = emoji,
-                        fontSize = 28.sp
-                    )
-                }
+                    if (habitType == HabitType.BINARY) {
+                        // Анимация иконки
+                        val transition = updateTransition(isCompleted, label = "CompletionTransition")
+                        val scale by transition.animateFloat(
+                            label = "IconScale",
+                            transitionSpec = { spring(stiffness = Spring.StiffnessLow) }
+                        ) { completed -> if (completed) 1.2f else 1f }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Описание
-                if (!description.isNullOrBlank()) {
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    Text(
-                        text = "Нет описания",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.weight(1f)
-                    )
+                        Icon(
+                            imageVector = if (isCompleted) Icons.Rounded.Check else Icons.Rounded.Close,
+                            contentDescription = null,
+                            tint = if (isCompleted) habitColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scale(scale)
+                        )
+                    } else {
+                        val displayPercent = (progress * 100).toInt()
+                        Text(
+                            text = "$displayPercent%",
+                            style = MaterialTheme.typography.displaySmall,
+                            color = habitColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Описание прогресса
+            Text(
+                text = progressText,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
 
-            // Прогресс
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Круговой индикатор прогресса
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(120.dp)
-                ) {
-                    // Фоновый круг
-                    CircularProgressIndicator(
-                        progress = 1f,
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        strokeWidth = 12.dp,
-                        strokeCap = StrokeCap.Round
-                    )
-
-                    // Прогресс
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = habitColor,
-                        strokeWidth = 12.dp,
-                        strokeCap = StrokeCap.Round
-                    )
-
-                    // Текст в центре
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (habitType == HabitType.BINARY) {
-                            Icon(
-                                imageVector = if (isCompleted) Icons.Default.Check else Icons.Default.Close,
-                                contentDescription = null,
-                                tint = if (isCompleted) habitColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        } else {
-                            Text(
-                                text = "${(progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = habitColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Текст прогресса
-                Text(
-                    text = progressText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
+            // Кнопки количественного прогресса
+            if (habitType != HabitType.BINARY) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Кнопки для изменения прогресса (+/-)
-                if (habitType != HabitType.BINARY) {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        modifier = Modifier.fillMaxWidth()
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(
+                        onClick = onDecrementClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = habitColor.copy(alpha = 0.1f),
+                            contentColor = habitColor
+                        ),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        OutlinedButton(
-                            onClick = onDecrementClick,
-                            border = BorderStroke(1.dp, habitColor),
-                            contentPadding = PaddingValues(horizontal = 24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Remove,
-                                contentDescription = "Уменьшить"
-                            )
-                        }
+                        Icon(Icons.Rounded.Remove, contentDescription = "Уменьшить")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Уменьшить")
+                    }
 
-                        OutlinedButton(
-                            onClick = onIncrementClick,
-                            border = BorderStroke(1.dp, habitColor),
-                            contentPadding = PaddingValues(horizontal = 24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Увеличить"
-                            )
-                        }
+                    Button(
+                        onClick = onIncrementClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = habitColor
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Увеличить")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Увеличить")
                     }
                 }
+            }
+
+            // Описание привычки
+            if (!description.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
 }
 
 @Composable
-fun HabitStatsSection(
+fun StreakSection(
     currentStreak: Int,
     bestStreak: Int,
+    habitColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        // Текущая серия
+        StreakCard(
+            value = currentStreak,
+            label = "Текущая серия",
+            icon = Icons.Rounded.LocalFireDepartment,
+            color = habitColor,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        )
+
+        // Лучшая серия
+        StreakCard(
+            value = bestStreak,
+            label = "Рекордная серия",
+            icon = Icons.Rounded.EmojiEvents,
+            color = habitColor,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+fun StreakCard(
+    value: Int,
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp, horizontal = 8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(32.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Анимированное число
+            val animatedValue = remember { Animatable(0f) }
+
+            LaunchedEffect(value) {
+                animatedValue.animateTo(
+                    targetValue = value.toFloat(),
+                    animationSpec = tween(
+                        durationMillis = 1000,
+                        easing = FastOutSlowInEasing
+                    )
+                )
+            }
+
+            Text(
+                text = animatedValue.value.toInt().toString(),
+                style = MaterialTheme.typography.headlineLarge,
+                color = color,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+fun StatsSection(
     calendarData: Map<LocalDate, Float>,
     weeklyData: List<Float>,
     monthlyData: List<Float>,
@@ -499,14 +647,14 @@ fun HabitStatsSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(24.dp)
         ) {
             // Заголовок секции
             Text(
@@ -516,46 +664,19 @@ fun HabitStatsSection(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Карточки с текущей серией и рекордной серией
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Текущая серия
-                StreakCard(
-                    label = "Текущая серия",
-                    value = currentStreak.toString(),
-                    icon = Icons.Default.Whatshot,
-                    color = habitColor,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Рекордная серия
-                StreakCard(
-                    label = "Рекордная серия",
-                    value = bestStreak.toString(),
-                    icon = Icons.Default.EmojiEvents,
-                    color = habitColor,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Календарь активности (тепловая карта)
+            // Календарь активности
             Text(
-                text = "История отметок",
+                text = "История выполнения",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Тепловая карта календаря
             CalendarHeatMap(
                 data = calendarData,
                 startDate = LocalDate.now().minusDays(29),
@@ -569,128 +690,141 @@ fun HabitStatsSection(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // График прогресса
-            Text(
-                text = "Прогресс по дням",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Переключатели периодов
+            // Переключатель периода графика
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Переключатель для "Неделя"
-                FilterChip(
-                    selected = selectedPeriod == ChartPeriod.WEEK,
-                    onClick = { onPeriodSelected(ChartPeriod.WEEK) },
-                    label = { Text("Неделя") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = habitColor.copy(alpha = 0.2f),
-                        selectedLabelColor = habitColor
-                    )
+                Text(
+                    text = "Прогресс по дням",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Переключатель для "Месяц"
-                FilterChip(
-                    selected = selectedPeriod == ChartPeriod.MONTH,
-                    onClick = { onPeriodSelected(ChartPeriod.MONTH) },
-                    label = { Text("Месяц") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = habitColor.copy(alpha = 0.2f),
-                        selectedLabelColor = habitColor
-                    )
+                SegmentedButtons(
+                    selectedPeriod = selectedPeriod,
+                    onPeriodSelected = onPeriodSelected,
+                    habitColor = habitColor
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // График в зависимости от выбранного периода
-            AnimatedVisibility(visible = selectedPeriod == ChartPeriod.WEEK) {
-                StatsBarGraph(
-                    data = weeklyData,
-                    maxValue = 1f,
-                    barColor = habitColor,
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    labels = getWeekLabels(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .padding(vertical = 8.dp)
-                )
-            }
-
-            AnimatedVisibility(visible = selectedPeriod == ChartPeriod.MONTH) {
-                StatsBarGraph(
-                    data = monthlyData,
-                    maxValue = 1f,
-                    barColor = habitColor,
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    labels = getMonthLabels(30),
-                    showAllLabels = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .padding(vertical = 8.dp)
-                )
+            // Граф данных
+            AnimatedContent(
+                targetState = selectedPeriod,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) +
+                            slideInHorizontally(
+                                animationSpec = tween(300),
+                                initialOffsetX = { if (targetState == ChartPeriod.WEEK) it else -it }
+                            ) with
+                            fadeOut(animationSpec = tween(300)) +
+                            slideOutHorizontally(
+                                animationSpec = tween(300),
+                                targetOffsetX = { if (targetState == ChartPeriod.WEEK) -it else it }
+                            )
+                },
+                label = "ChartAnimation"
+            ) { period ->
+                when (period) {
+                    ChartPeriod.WEEK -> {
+                        StatsBarGraph(
+                            data = weeklyData,
+                            maxValue = 1f,
+                            barColor = habitColor,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            labels = getWeekLabels(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .padding(top = 8.dp)
+                        )
+                    }
+                    ChartPeriod.MONTH -> {
+                        StatsBarGraph(
+                            data = monthlyData,
+                            maxValue = 1f,
+                            barColor = habitColor,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            labels = getMonthLabels(30),
+                            showAllLabels = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .padding(top = 8.dp)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun StreakCard(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    color: Color,
+fun SegmentedButtons(
+    selectedPeriod: ChartPeriod,
+    onPeriodSelected: (ChartPeriod) -> Unit,
+    habitColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(24.dp)
+            )
+            .clip(RoundedCornerShape(24.dp))
+    ) {
+        SegmentedButton(
+            selected = selectedPeriod == ChartPeriod.WEEK,
+            onClick = { onPeriodSelected(ChartPeriod.WEEK) },
+            text = "Неделя",
+            habitColor = habitColor,
+            modifier = Modifier.weight(1f)
+        )
+
+        SegmentedButton(
+            selected = selectedPeriod == ChartPeriod.MONTH,
+            onClick = { onPeriodSelected(ChartPeriod.MONTH) },
+            text = "Месяц",
+            habitColor = habitColor,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+fun SegmentedButton(
+    selected: Boolean,
+    onClick: () -> Unit,
+    text: String,
+    habitColor: Color,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = color.copy(alpha = 0.1f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+    Box(
         modifier = modifier
+            .clickable(onClick = onClick)
+            .background(
+                color = if (selected) habitColor.copy(alpha = 0.1f) else Color.Transparent,
+                shape = RoundedCornerShape(24.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(28.dp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = color,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
-        }
+        Text(
+            text = text,
+            color = if (selected) habitColor else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+        )
     }
 }
 
 @Composable
-fun HabitDetailsSection(
+fun DetailsSection(
     frequencyText: String,
     targetValueText: String,
     category: Category?,
@@ -701,18 +835,18 @@ fun HabitDetailsSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(24.dp)
         ) {
             // Заголовок секции
             Text(
-                text = "Настройки",
+                text = "Информация",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
@@ -720,56 +854,70 @@ fun HabitDetailsSection(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Частота
+            // Частота выполнения
             DetailItem(
-                icon = Icons.Default.Repeat,
+                icon = Icons.Rounded.Repeat,
                 label = "Частота",
                 value = frequencyText,
                 color = habitColor
             )
 
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
+            Divider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
 
             // Целевое значение
             DetailItem(
-                icon = Icons.Default.Flag,
+                icon = Icons.Rounded.Flag,
                 label = "Цель",
                 value = targetValueText,
                 color = habitColor
             )
 
-            // Категория, если есть
+            // Категория
             if (category != null) {
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                Divider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                )
+
+                val categoryColor = try {
+                    category.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: habitColor
+                } catch (e: Exception) {
+                    habitColor
+                }
 
                 DetailItem(
-                    icon = Icons.Default.Folder,
+                    icon = Icons.Rounded.Folder,
                     label = "Категория",
                     value = category.name,
-                    color = try {
-                        category.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: habitColor
-                    } catch (e: Exception) {
-                        habitColor
-                    }
+                    color = categoryColor,
+                    chip = true
                 )
             }
 
-            // Теги, если есть
+            // Теги
             if (tags.isNotEmpty()) {
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                Divider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                )
 
                 Column {
                     Text(
                         text = "Теги",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Отображаем теги в виде чипов
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         tags.forEach { tag ->
                             val tagColor = try {
@@ -780,8 +928,7 @@ fun HabitDetailsSection(
 
                             TagChip(
                                 text = tag.name,
-                                color = tagColor,
-                                modifier = Modifier.padding(end = 8.dp)
+                                color = tagColor
                             )
                         }
                     }
@@ -796,36 +943,70 @@ fun DetailItem(
     icon: ImageVector,
     label: String,
     value: String,
-    color: Color
+    color: Color,
+    chip: Boolean = false
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
+        // Иконка
+        Box(
             modifier = Modifier
-                .size(24.dp)
-                .padding(end = 4.dp)
-        )
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Информация
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (chip) {
+                SuggestionChip(
+                    onClick = { },
+                    label = {
+                        Text(
+                            text = value,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                        )
+                    },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = color.copy(alpha = 0.1f),
+                        labelColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            } else {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
@@ -833,51 +1014,135 @@ fun DetailItem(
 @Composable
 fun TagChip(
     text: String,
-    color: Color,
-    modifier: Modifier = Modifier
+    color: Color
 ) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = color.copy(alpha = 0.1f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
-        modifier = modifier
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
+    SuggestionChip(
+        onClick = { },
+        label = { Text(text = text) },
+        icon = {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
                     .background(color)
             )
+        },
+        colors = SuggestionChipDefaults.suggestionChipColors(
+            containerColor = color.copy(alpha = 0.1f),
+            labelColor = MaterialTheme.colorScheme.onSurface
+        ),
+        border = null
+    )
+}
 
-            Spacer(modifier = Modifier.width(6.dp))
+@Composable
+fun ActionsSection(
+    onShareClick: () -> Unit,
+    onArchiveClick: () -> Unit,
+    isArchived: Boolean
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Кнопка поделиться
+            OutlinedButton(
+                onClick = onShareClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Share,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Поделиться привычкой")
+            }
 
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Кнопка архивировать/восстановить
+            OutlinedButton(
+                onClick = onArchiveClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (isArchived)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.secondary
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Icon(
+                    imageVector = if (isArchived)
+                        Icons.Rounded.Unarchive
+                    else
+                        Icons.Rounded.Archive,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArchived) "Восстановить из архива" else "Архивировать привычку"
+                )
+            }
         }
     }
 }
 
-// Вспомогательные функции для получения подписей для графика
+/**
+ * Получает список подписей для дней недели
+ */
 @Composable
-fun getWeekLabels(): List<String> {
-    val formatter = DateTimeFormatter.ofPattern("EE", Locale.getDefault())
-    return List(7) { i ->
-        LocalDate.now().minusDays(6 - i.toLong()).format(formatter)
+private fun getWeekLabels(): List<String> {
+    // Сокращенные названия дней недели
+    val today = LocalDate.now()
+    val dayFormatter = DateTimeFormatter.ofPattern("EE")
+
+    return (0..6).map { dayOffset ->
+        val day = today.minusDays((today.dayOfWeek.value - 1).toLong()).plusDays(dayOffset.toLong())
+        dayFormatter.format(day)
     }
 }
 
+/**
+ * Получает список подписей для дней месяца
+ */
+private fun getMonthLabels(days: Int): List<String> {
+    // Номера дней для последних N дней
+    val today = LocalDate.now()
+
+    return (days - 1 downTo 0).map { daysAgo ->
+        val date = today.minusDays(daysAgo.toLong())
+        date.dayOfMonth.toString()
+    }
+}
+
+
 @Composable
-fun getMonthLabels(days: Int): List<String> {
-    val formatter = DateTimeFormatter.ofPattern("d", Locale.getDefault())
-    return List(days) { i ->
-        LocalDate.now().minusDays((days - 1 - i).toLong()).format(formatter)
+private fun calculateHabitColor(habit: Habit?): Color {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    return remember(habit, primaryColor) {
+        if (habit?.color == null) {
+            primaryColor
+        } else {
+            try {
+                Color(android.graphics.Color.parseColor(habit.color))
+            } catch (e: Exception) {
+                primaryColor
+            }
+        }
     }
 }

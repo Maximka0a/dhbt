@@ -66,7 +66,9 @@ fun TaskDetailContent(
         if (state.tags.isNotEmpty()) {
             TaskTagsSection(tags = state.tags)
 
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
         }
 
         // Дополнительная информация

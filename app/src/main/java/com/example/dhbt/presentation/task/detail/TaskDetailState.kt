@@ -4,12 +4,7 @@ import com.example.dhbt.domain.model.Category
 import com.example.dhbt.domain.model.Subtask
 import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.model.Task
-import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskRecurrence
-import com.example.dhbt.domain.model.TaskStatus
-import org.threeten.bp.LocalDate
-import org.threeten.bp.LocalDateTime
-import org.threeten.bp.LocalTime
 
 /**
  * Состояние экрана деталей задачи

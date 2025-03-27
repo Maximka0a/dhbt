@@ -179,7 +179,8 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             Log.d(TAG, "Увеличение прогресса привычки $habitId")
             try {
-                habitRepository.incrementHabitProgress(habitId)
+                val today = Calendar.getInstance().timeInMillis
+                habitRepository.incrementHabitProgress(habitId, today)
 
                 // После инкремента получаем актуальный прогресс на сегодня
                 val todayProgress = habitRepository.getHabitProgressForToday(habitId)

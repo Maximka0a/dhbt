@@ -2,32 +2,42 @@ package com.example.dhbt.presentation.task.list
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -39,16 +49,22 @@ import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskStatus
 import com.example.dhbt.presentation.shared.EmojiIcon
-import com.example.dhbt.presentation.shared.EmptyStateMessage
 import com.example.dhbt.presentation.shared.EmptyStateWithIcon
 import com.example.dhbt.presentation.util.toColor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.saket.swipe.SwipeAction
 import me.saket.swipe.SwipeableActionsBox
-import org.threeten.bp.LocalDate
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalComposeUiApi::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun TasksScreen(
     onTaskClick: (String) -> Unit,
@@ -63,25 +79,70 @@ fun TasksScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Состояния UI
     var isCalendarExpanded by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
-    var showFilterDialog by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var expandedFilterSection by remember { mutableStateOf(false) }
+
+    val searchFocusRequester = remember { FocusRequester() }
+
+    // Анимации
+    val searchBarHeight by animateFloatAsState(
+        targetValue = if (isSearchActive) 1f else 0f,
+        label = "searchBarHeight"
+    )
 
     Scaffold(
         topBar = {
             TasksTopAppBar(
-                onSearchClicked = { showFilterDialog = true },
+                isSearchActive = isSearchActive,
+                onSearchActiveChange = { active ->
+                    isSearchActive = active
+                    if (active) {
+                        scope.launch {
+                            delay(100) // Небольшая задержка для анимации
+                            searchFocusRequester.requestFocus()
+                        }
+                    } else {
+                        keyboardController?.hide()
+                        // Если пользователь закрывает поиск, очищаем поисковый запрос
+                        if (filterState.searchQuery.isNotEmpty()) {
+                            viewModel.onSearchQueryChanged("")
+                        }
+                    }
+                },
+                searchQuery = filterState.searchQuery,
+                onSearchQueryChanged = { query -> viewModel.onSearchQueryChanged(query) },
+                onClearSearch = { viewModel.onSearchQueryChanged("") },
+                onSearchSubmit = { keyboardController?.hide() },
                 onSortClicked = { showSortMenu = !showSortMenu },
+                onExpandFilterClicked = { expandedFilterSection = !expandedFilterSection },
                 isFiltersActive = filterState != TaskFilterState(),
                 onResetFilters = { viewModel.resetFilters() },
                 onToggleEisenhowerMatrix = { viewModel.onToggleEisenhowerMatrix(it) },
-                showEisenhowerMatrix = filterState.showEisenhowerMatrix
+                showEisenhowerMatrix = filterState.showEisenhowerMatrix,
+                searchFocusRequester = searchFocusRequester,
+                filterState = filterState
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddTask) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_task))
+            FloatingActionButton(
+                onClick = onAddTask,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp
+                )
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.add_task)
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -91,13 +152,30 @@ fun TasksScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Расширенная панель фильтров (отображается, когда пользователь нажимает на фильтр)
+            AnimatedVisibility(
+                visible = expandedFilterSection,
+                enter = fadeIn() + expandVertically(animationSpec = tween(300)),
+                exit = fadeOut() + shrinkVertically(animationSpec = tween(300))
+            ) {
+                ExpandedFilterSection(
+                    selectedStatus = filterState.selectedStatus,
+                    onStatusSelected = { viewModel.onStatusSelected(it) },
+                    selectedPriority = filterState.selectedPriority,
+                    onPrioritySelected = { viewModel.onPrioritySelected(it) },
+                    tags = tags,
+                    selectedTagIds = filterState.selectedTagIds,
+                    onTagSelected = { viewModel.onTagSelected(it) }
+                )
+            }
+
             // Календарь (компактный или развернутый)
             AnimatedVisibility(
                 visible = true,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
-                TaskCalendarSimple(
+                TaskCalendarView(
                     isExpanded = isCalendarExpanded,
                     onExpandToggle = { isCalendarExpanded = !isCalendarExpanded },
                     selectedDate = filterState.selectedDate,
@@ -148,11 +226,9 @@ fun TasksScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.tasks.isEmpty()) {
-                EmptyStateWithIcon(
-                    message = stringResource(R.string.no_tasks_found),
-                    icon = Icons.Default.Assignment,
-                    actionLabel = stringResource(R.string.add_task),
-                    onActionClicked = onAddTask
+                EmptyTasksState(
+                    searchQuery = filterState.searchQuery,
+                    onAddTask = onAddTask
                 )
             } else if (filterState.showEisenhowerMatrix) {
                 EisenhowerMatrix(
@@ -164,9 +240,14 @@ fun TasksScreen(
                     onTaskDelete = { taskId ->
                         viewModel.onDeleteTask(taskId)
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = "Задача удалена"
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Задача удалена",
+                                actionLabel = "Отменить",
+                                duration = SnackbarDuration.Short
                             )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                // TODO: Реализовать восстановление задачи
+                            }
                         }
                     }
                 )
@@ -180,95 +261,348 @@ fun TasksScreen(
                     onTaskDelete = { taskId ->
                         viewModel.onDeleteTask(taskId)
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = "Задача удалена"
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Задача удалена",
+                                actionLabel = "Отменить",
+                                duration = SnackbarDuration.Short
                             )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                // TODO: Реализовать восстановление задачи
+                            }
                         }
                     },
                     onTaskArchive = { taskId ->
                         viewModel.onArchiveTask(taskId)
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = "Задача архивирована"
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Задача архивирована",
+                                actionLabel = "Отменить",
+                                duration = SnackbarDuration.Short
                             )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                // TODO: Реализовать восстановление задачи из архива
+                            }
                         }
                     }
                 )
             }
         }
     }
-
-    // Диалог фильтрации
-    if (showFilterDialog) {
-        FilterDialog(
-            onDismiss = { showFilterDialog = false },
-            currentStatus = filterState.selectedStatus,
-            onStatusSelected = { viewModel.onStatusSelected(it) },
-            currentPriority = filterState.selectedPriority,
-            onPrioritySelected = { viewModel.onPrioritySelected(it) },
-            tags = tags,
-            selectedTagIds = filterState.selectedTagIds,
-            onTagSelected = { viewModel.onTagSelected(it) },
-            searchQuery = filterState.searchQuery,
-            onSearchQueryChanged = { viewModel.onSearchQueryChanged(it) }
-        )
-    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun TasksTopAppBar(
-    onSearchClicked: () -> Unit,
+    isSearchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
+    searchQuery: String,
+    onSearchQueryChanged: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onSearchSubmit: () -> Unit,
     onSortClicked: () -> Unit,
+    onExpandFilterClicked: () -> Unit,
     isFiltersActive: Boolean,
     onResetFilters: () -> Unit,
     onToggleEisenhowerMatrix: (Boolean) -> Unit,
-    showEisenhowerMatrix: Boolean
+    showEisenhowerMatrix: Boolean,
+    searchFocusRequester: FocusRequester,
+    filterState: TaskFilterState
 ) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.tasks)) },
-        actions = {
-            // Кнопка поиска
-            IconButton(onClick = onSearchClicked) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = stringResource(R.string.search)
-                )
-            }
-
-            // Кнопка сортировки
-            IconButton(onClick = onSortClicked) {
-                Icon(
-                    imageVector = Icons.Default.Sort,
-                    contentDescription = stringResource(R.string.sort)
-                )
-            }
-
-            // Кнопка матрицы Эйзенхауэра
-            IconButton(onClick = { onToggleEisenhowerMatrix(!showEisenhowerMatrix) }) {
-                Icon(
-                    imageVector = Icons.Default.GridView,
-                    contentDescription = stringResource(R.string.eisenhower_matrix),
-                    tint = if (showEisenhowerMatrix) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                )
-            }
-
-            // Кнопка сброса фильтров (отображается только когда фильтры активны)
-            AnimatedVisibility(visible = isFiltersActive) {
-                IconButton(onClick = onResetFilters) {
-                    Icon(
-                        imageVector = Icons.Default.FilterAlt,
-                        contentDescription = stringResource(R.string.reset_filters),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+    Column {
+        // Основной верхний бар
+        TopAppBar(
+            title = {
+                if (!isSearchActive) {
+                    Text(stringResource(R.string.tasks))
                 }
-            }
+            },
+            actions = {
+                // Поиск (значок или поле ввода)
+                if (isSearchActive) {
+                    // Поле поиска
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        placeholder = { Text(stringResource(R.string.search_tasks)) },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = onClearSearch) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = stringResource(R.string.clear)
+                                    )
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 8.dp)
+                            .focusRequester(searchFocusRequester),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                } else {
+                    // Кнопка поиска
+                    IconButton(onClick = { onSearchActiveChange(true) }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search)
+                        )
+                    }
+
+                    // Кнопка фильтров
+                    IconButton(onClick = onExpandFilterClicked) {
+                        BadgedBox(
+                            badge = {
+                                if (isFiltersActive) {
+                                    Badge { Text("!") }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = stringResource(R.string.filter)
+                            )
+                        }
+                    }
+
+                    // Кнопка сортировки
+                    IconButton(onClick = onSortClicked) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = stringResource(R.string.sort)
+                        )
+                    }
+
+                    // Кнопка матрицы Эйзенхауэра
+                    IconButton(onClick = { onToggleEisenhowerMatrix(!showEisenhowerMatrix) }) {
+                        Icon(
+                            imageVector = Icons.Outlined.GridView,
+                            contentDescription = stringResource(R.string.eisenhower_matrix),
+                            tint = if (showEisenhowerMatrix)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                LocalContentColor.current
+                        )
+                    }
+
+                    // Кнопка сброса фильтров (отображается только когда фильтры активны)
+                    AnimatedVisibility(visible = isFiltersActive) {
+                        IconButton(onClick = onResetFilters) {
+                            Icon(
+                                imageVector = Icons.Default.RestartAlt,
+                                contentDescription = stringResource(R.string.reset_filters),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            },
+            navigationIcon = {
+                if (isSearchActive) {
+                    IconButton(onClick = { onSearchActiveChange(false) }) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.close_search)
+                        )
+                    }
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        // Индикатор активных фильтров
+        if (isFiltersActive && !isSearchActive) {
+            ActiveFiltersIndicator(
+                filterState = filterState,
+                onResetFilters = onResetFilters
+            )
         }
-    )
+    }
 }
 
 @Composable
-fun TaskCalendarSimple(
+fun ActiveFiltersIndicator(
+    filterState: TaskFilterState,
+    onResetFilters: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.FilterAlt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+
+        Text(
+            text = buildFilterDescription(filterState),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+        )
+
+        TextButton(
+            onClick = onResetFilters,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.clear_all),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+fun buildFilterDescription(filterState: TaskFilterState): String {
+    val filters = mutableListOf<String>()
+
+    filterState.selectedDate?.let {
+        filters.add("Дата: ${it.format(DateTimeFormatter.ofPattern("d MMM"))}")
+    }
+
+    filterState.selectedCategoryId?.let {
+        filters.add("Категория")
+    }
+
+    filterState.selectedStatus?.let {
+        val statusName = when(it) {
+            TaskStatus.ACTIVE -> stringResource(R.string.active)
+            TaskStatus.COMPLETED -> stringResource(R.string.completed)
+            TaskStatus.ARCHIVED -> stringResource(R.string.archived)
+        }
+        filters.add("Статус: $statusName")
+    }
+
+    filterState.selectedPriority?.let {
+        val priorityName = when(it) {
+            TaskPriority.HIGH -> stringResource(R.string.high)
+            TaskPriority.MEDIUM -> stringResource(R.string.medium)
+            TaskPriority.LOW -> stringResource(R.string.low)
+        }
+        filters.add("Приоритет: $priorityName")
+    }
+
+    if (filterState.selectedTagIds.isNotEmpty()) {
+        filters.add("Теги: ${filterState.selectedTagIds.size}")
+    }
+
+    if (filterState.searchQuery.isNotEmpty()) {
+        filters.add("Поиск: \"${filterState.searchQuery}\"")
+    }
+
+    return filters.joinToString(" | ")
+}
+
+@Composable
+fun ExpandedFilterSection(
+    selectedStatus: TaskStatus?,
+    onStatusSelected: (TaskStatus?) -> Unit,
+    selectedPriority: TaskPriority?,
+    onPrioritySelected: (TaskPriority?) -> Unit,
+    tags: List<Tag>,
+    selectedTagIds: List<String>,
+    onTagSelected: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Заголовок
+            Text(
+                text = stringResource(R.string.filter_tasks),
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            // Статусы
+            Text(
+                text = stringResource(R.string.status),
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            StatusFilterChips(
+                currentStatus = selectedStatus,
+                onStatusSelected = onStatusSelected
+            )
+
+            // Приоритеты
+            Text(
+                text = stringResource(R.string.priority),
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            PriorityFilterChips(
+                currentPriority = selectedPriority,
+                onPrioritySelected = onPrioritySelected
+            )
+
+            // Теги
+            if (tags.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.tags),
+                    style = MaterialTheme.typography.labelMedium
+                )
+
+                FlowRow(
+                    mainAxisSpacing = 8.dp,
+                    crossAxisSpacing = 8.dp,
+                ) {
+                    tags.forEach { tag ->
+                        val isSelected = selectedTagIds.contains(tag.id)
+
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onTagSelected(tag.id) },
+                            label = { Text(tag.name) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = tag.color?.toColor()?.copy(alpha = 0.2f)
+                                    ?: MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskCalendarView(
     isExpanded: Boolean,
     onExpandToggle: () -> Unit,
     selectedDate: LocalDate?,
@@ -280,26 +614,47 @@ fun TaskCalendarSimple(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
         Column {
             // Заголовок календаря с кнопкой разворачивания
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Отображение текущей или выбранной даты
-                Text(
-                    text = if (selectedDate != null) {
-                        selectedDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))
-                    } else {
-                        "Календарь"
-                    },
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DateRange,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = if (selectedDate != null) {
+                            selectedDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))
+                        } else {
+                            stringResource(R.string.today) + ": " +
+                                    today.format(DateTimeFormatter.ofPattern("d MMMM"))
+                        },
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
 
                 // Кнопка для сворачивания/разворачивания календаря
                 val rotationAngle by animateFloatAsState(
@@ -345,12 +700,14 @@ fun SimpleCalendarView(
     val daysToShow = 28 // Показываем 4 недели
     val startDate = today.minusWeeks(1)
 
-    Column {
+    Column(
+        modifier = Modifier.padding(bottom = 16.dp)
+    ) {
         // Дни недели
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 4.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             val daysOfWeek = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
@@ -359,7 +716,8 @@ fun SimpleCalendarView(
                     text = day,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -370,7 +728,7 @@ fun SimpleCalendarView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 2.dp),
+                        .padding(vertical = 2.dp, horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     for (dayIndex in 0 until 7) {
@@ -378,6 +736,15 @@ fun SimpleCalendarView(
                         val isSelected = selectedDate == date
                         val hasTask = datesWithTasks.contains(date)
                         val isToday = today == date
+                        val isWeekend = date.dayOfWeek.value > 5
+
+                        // Подсветка выходных дней другим цветом
+                        val dayColor = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                            isWeekend -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
 
                         Box(
                             modifier = Modifier
@@ -403,17 +770,17 @@ fun SimpleCalendarView(
                                         Modifier
                                     }
                                 )
-                                .clickable { onDateSelected(date) },
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    onClick = { onDateSelected(date) }
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = date.dayOfMonth.toString(),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = when {
-                                    isSelected -> MaterialTheme.colorScheme.onPrimary
-                                    isToday -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                }
+                                color = dayColor
                             )
                         }
                     }
@@ -433,7 +800,7 @@ fun CategoryFilterRow(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp, horizontal = 8.dp),
+            .padding(vertical = 8.dp, horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Кнопка "Все"
@@ -442,7 +809,14 @@ fun CategoryFilterRow(
                 selected = selectedCategoryId == null,
                 onClick = { onCategorySelected("") },
                 label = { Text(stringResource(R.string.all)) },
-                leadingIcon = { Icon(Icons.Default.FilterList, null) }
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.FilterList,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                shape = RoundedCornerShape(16.dp)
             )
         }
 
@@ -458,13 +832,14 @@ fun CategoryFilterRow(
                     EmojiIcon(
                         emoji = category.iconEmoji ?: "📝",
                         backgroundColor = category.color?.toColor() ?: MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = category.color?.toColor()?.copy(alpha = 0.2f)
                         ?: MaterialTheme.colorScheme.primaryContainer
-                )
+                ),
+                shape = RoundedCornerShape(16.dp)
             )
         }
     }
@@ -479,52 +854,55 @@ fun SortOptionsMenu(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(vertical = 12.dp)) {
             Text(
                 text = stringResource(R.string.sort_by),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
             SortOptionItem(
-                icon = Icons.Default.DateRange,
+                icon = Icons.Outlined.DateRange,
                 title = stringResource(R.string.due_date_asc),
                 selected = currentSortOption == SortOption.DATE_ASC,
                 onClick = { onSortOptionSelected(SortOption.DATE_ASC) }
             )
 
             SortOptionItem(
-                icon = Icons.Default.DateRange,
+                icon = Icons.Outlined.DateRange,
                 title = stringResource(R.string.due_date_desc),
                 selected = currentSortOption == SortOption.DATE_DESC,
                 onClick = { onSortOptionSelected(SortOption.DATE_DESC) }
             )
 
             SortOptionItem(
-                icon = Icons.Default.PriorityHigh,
+                icon = Icons.Outlined.PriorityHigh,
                 title = stringResource(R.string.priority_high_to_low),
                 selected = currentSortOption == SortOption.PRIORITY_HIGH,
                 onClick = { onSortOptionSelected(SortOption.PRIORITY_HIGH) }
             )
 
             SortOptionItem(
-                icon = Icons.Default.LowPriority,
+                icon = Icons.Outlined.LowPriority,
                 title = stringResource(R.string.priority_low_to_high),
                 selected = currentSortOption == SortOption.PRIORITY_LOW,
                 onClick = { onSortOptionSelected(SortOption.PRIORITY_LOW) }
             )
 
             SortOptionItem(
-                icon = Icons.Default.SortByAlpha,
+                icon = Icons.Outlined.SortByAlpha,
                 title = stringResource(R.string.alphabetical),
                 selected = currentSortOption == SortOption.ALPHABETICAL,
                 onClick = { onSortOptionSelected(SortOption.ALPHABETICAL) }
             )
 
             SortOptionItem(
-                icon = Icons.Default.Update,
+                icon = Icons.Outlined.Update,
                 title = stringResource(R.string.creation_date),
                 selected = currentSortOption == SortOption.CREATION_DATE,
                 onClick = { onSortOptionSelected(SortOption.CREATION_DATE) }
@@ -544,20 +922,23 @@ fun SortOptionItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-            modifier = Modifier.size(24.dp)
+            tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current.copy(alpha = 0.7f),
+            modifier = Modifier.size(20.dp)
         )
 
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            color = if (selected)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp)
@@ -568,9 +949,31 @@ fun SortOptionItem(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+@Composable
+fun EmptyTasksState(
+    searchQuery: String,
+    onAddTask: () -> Unit
+) {
+    if (searchQuery.isNotEmpty()) {
+        // Пустой результат поиска
+        EmptyStateWithIcon(
+            message = stringResource(R.string.no_search_results, searchQuery),
+            icon = Icons.Outlined.SearchOff,
+        )
+    } else {
+        // Нет задач вообще
+        EmptyStateWithIcon(
+            message = stringResource(R.string.no_tasks_found),
+            icon = Icons.Outlined.Assignment,
+            actionLabel = stringResource(R.string.add_task),
+            onActionClicked = onAddTask
+        )
     }
 }
 
@@ -585,72 +988,27 @@ fun TasksList(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 72.dp) // Оставляем место для FAB
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
+            bottom = 88.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Группировка задач по дате если есть дата
-        val tasksByDate = tasks.groupBy { task ->
-            task.dueDate?.let { dueDate ->
-                LocalDate.ofEpochDay(dueDate / (24 * 60 * 60 * 1000))
-            } ?: LocalDate.MAX
-        }.toSortedMap()
-
-        // Сначала задачи без даты
-        if (tasksByDate.containsKey(LocalDate.MAX)) {
-            item {
-                Text(
-                    text = stringResource(R.string.no_due_date),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            items(
-                items = tasksByDate[LocalDate.MAX] ?: emptyList(),
-                key = { it.id }
-            ) { task ->
-                TaskItem(
-                    task = task,
-                    onTaskClick = onTaskClick,
-                    onTaskStatusChange = onTaskStatusChange,
-                    onTaskDelete = onTaskDelete,
-                    onTaskArchive = onTaskArchive,
-                    modifier = Modifier.animateItemPlacement()
-                )
-            }
+        items(
+            items = tasks,
+            key = { it.id }
+        ) { task ->
+            TaskItem(
+                task = task,
+                onClick = { onTaskClick(task.id) },
+                onStatusChange = { isCompleted -> onTaskStatusChange(task.id, isCompleted) },
+                onDelete = { onTaskDelete(task.id) },
+                onArchive = { onTaskArchive(task.id) },
+                modifier = Modifier.animateItemPlacement()
+            )
         }
-
-        // Затем задачи с датами, сгруппированные по дням
-        tasksByDate.entries
-            .filter { it.key != LocalDate.MAX }
-            .forEach { (date, tasksForDate) ->
-                item {
-                    Text(
-                        text = formatDateHeader(date),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-
-                items(
-                    items = tasksForDate,
-                    key = { it.id }
-                ) { task ->
-                    TaskItem(
-                        task = task,
-                        onTaskClick = onTaskClick,
-                        onTaskStatusChange = onTaskStatusChange,
-                        onTaskDelete = onTaskDelete,
-                        onTaskArchive = onTaskArchive,
-                        modifier = Modifier.animateItemPlacement()
-                    )
-                }
-            }
     }
 }
 
@@ -658,74 +1016,54 @@ fun TasksList(
 @Composable
 fun TaskItem(
     task: Task,
-    onTaskClick: (String) -> Unit,
-    onTaskStatusChange: (String, Boolean) -> Unit,
-    onTaskDelete: (String) -> Unit,
-    onTaskArchive: (String) -> Unit,
+    onClick: () -> Unit,
+    onStatusChange: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+    onArchive: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val completeAction = SwipeAction(
-        onSwipe = { onTaskStatusChange(task.id, task.status != TaskStatus.COMPLETED) },
-        icon = {
-            Icon(
-                imageVector = if (task.status == TaskStatus.COMPLETED)
-                    Icons.Default.Clear
-                else
-                    Icons.Default.Check,
-                contentDescription = if (task.status == TaskStatus.COMPLETED)
-                    stringResource(R.string.mark_incomplete)
-                else
-                    stringResource(R.string.mark_complete),
-                tint = Color.White
-            )
-        },
-        background = if (task.status == TaskStatus.COMPLETED)
-            MaterialTheme.colorScheme.error
-        else
-            Color(0xFF4CAF50)
-    )
-
-    val archiveAction = SwipeAction(
-        onSwipe = { onTaskArchive(task.id) },
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Archive,
-                contentDescription = stringResource(R.string.archive),
-                tint = Color.White
-            )
-        },
-        background = MaterialTheme.colorScheme.tertiary
-    )
-
     val deleteAction = SwipeAction(
-        onSwipe = { onTaskDelete(task.id) },
         icon = {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = stringResource(R.string.delete),
-                tint = Color.White
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
             )
         },
-        background = MaterialTheme.colorScheme.error
+        background = Color.Red,
+        onSwipe = onDelete
+    )
+
+    val archiveAction = SwipeAction(
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Archive,
+                contentDescription = stringResource(R.string.archive),
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        },
+        background = MaterialTheme.colorScheme.tertiary,
+        onSwipe = onArchive
     )
 
     SwipeableActionsBox(
-        startActions = listOf(completeAction),
-        endActions = listOf(archiveAction, deleteAction),
+        startActions = listOf(archiveAction),
+        endActions = listOf(deleteAction),
+        swipeThreshold = 96.dp,
         modifier = modifier
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clickable { onTaskClick(task.id) },
-            shape = RoundedCornerShape(8.dp),
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = if (task.status == TaskStatus.COMPLETED)
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                else
-                    MaterialTheme.colorScheme.onSurface
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 2.dp
             )
         ) {
             Row(
@@ -734,135 +1072,135 @@ fun TaskItem(
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Чекбокс для статуса
+                // Чекбокс для изменения статуса задачи
                 Checkbox(
                     checked = task.status == TaskStatus.COMPLETED,
-                    onCheckedChange = { isChecked ->
-                        onTaskStatusChange(task.id, isChecked)
-                    },
+                    onCheckedChange = { isChecked -> onStatusChange(isChecked) },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = getPriorityColor(task.priority)
+                        checkedColor = when (task.priority) {
+                            TaskPriority.HIGH -> MaterialTheme.colorScheme.error
+                            TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                            TaskPriority.LOW -> MaterialTheme.colorScheme.primary
+                        }
                     )
                 )
-
-                // Цветовая метка приоритета
-                Box(
-                    modifier = Modifier
-                        .size(width = 4.dp, height = 36.dp)
-                        .background(
-                            color = getPriorityColor(task.priority),
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
 
                 // Основное содержимое задачи
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
                 ) {
-                    // Заголовок задачи
+                    // Название задачи
                     Text(
                         text = task.title,
                         style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.alpha(
-                            if (task.status == TaskStatus.COMPLETED) 0.6f else 1f
-                        )
+                        color = if (task.status == TaskStatus.COMPLETED)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        else
+                            MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (task.status == TaskStatus.COMPLETED)
+                            TextDecoration.LineThrough
+                        else
+                            null,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
 
-                    // Описание (если есть)
-                    task.description?.let {
-                        if (it.isNotEmpty()) {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.alpha(
-                                    if (task.status == TaskStatus.COMPLETED) 0.6f else 1f
+                    // Дополнительная информация (дата, категория)
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Срок выполнения
+                        task.dueDate?.let { dueDate ->
+                            val localDate = Instant.ofEpochMilli(dueDate)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+
+                            val dateColor = when {
+                                task.status == TaskStatus.COMPLETED -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                localDate.isBefore(LocalDate.now()) -> MaterialTheme.colorScheme.error
+                                localDate.isEqual(LocalDate.now()) -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Event,
+                                    contentDescription = null,
+                                    tint = dateColor,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatDueDate(localDate),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = dateColor
+                                )
+                            }
+                        }
+
+                        // Категория (необходимо получить из категорий по ID)
+                        task.categoryId?.let { categoryId ->
+                            // Получаем цвет из задачи, если он есть
+                            val categoryColor = task.color?.toColor() ?: MaterialTheme.colorScheme.primary
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(categoryColor, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = categoryId, // В идеале здесь должно быть имя категории
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
-
-                    // Показываем время, если оно есть
-                    task.dueTime?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary.copy(
-                                alpha = if (task.status == TaskStatus.COMPLETED) 0.6f else 1f
-                            )
-                        )
-                    }
                 }
 
-                // Если есть подзадачи, показываем индикатор прогресса
-                if (task.subtasks.isNotEmpty()) {
-                    val completed = task.subtasks.count { it.isCompleted }
-                    val total = task.subtasks.size
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(start = 8.dp)
-                    ) {
-                        Text(
-                            text = "$completed/$total",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-
-                        LinearProgressIndicator(
-                            progress = { if (total > 0) completed.toFloat() / total else 0f },
-                            modifier = Modifier
-                                .width(32.dp)
-                                .padding(top = 4.dp),
-                            color = getPriorityColor(task.priority),
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Если есть теги, показываем их внизу карточки
-            if (task.tags.isNotEmpty()) {
-                Row(
+                // Индикатор приоритета
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 52.dp, end = 12.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    for (tag in task.tags.take(3)) {
-                        TaskTag(tag = tag)
-                    }
-
-                    // Если тегов больше трех, показываем счетчик
-                    if (task.tags.size > 3) {
-                        Text(
-                            text = "+${task.tags.size - 3}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        .size(width = 4.dp, height = 40.dp)
+                        .background(
+                            color = when (task.priority) {
+                                TaskPriority.HIGH -> MaterialTheme.colorScheme.error
+                                TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                                TaskPriority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            },
+                            shape = RoundedCornerShape(2.dp)
                         )
-                    }
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-fun TaskTag(tag: Tag) {
-    Surface(
-        color = tag.color?.toColor()?.copy(alpha = 0.2f) ?: MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = tag.color?.toColor() ?: MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Text(
-            text = tag.name,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-        )
+fun formatDueDate(date: LocalDate): String {
+    val today = LocalDate.now()
+    val tomorrow = today.plusDays(1)
+
+    return when {
+        date.isEqual(today) -> stringResource(R.string.today)
+        date.isEqual(tomorrow) -> stringResource(R.string.tomorrow)
+        date.isBefore(today) -> stringResource(R.string.overdue) + ": " +
+                date.format(DateTimeFormatter.ofPattern("d MMM"))
+        date.year == today.year -> date.format(DateTimeFormatter.ofPattern("d MMM"))
+        else -> date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))
     }
 }
 
@@ -873,113 +1211,110 @@ fun EisenhowerMatrix(
     onTaskStatusChange: (String, Boolean) -> Unit,
     onTaskDelete: (String) -> Unit
 ) {
-    // Группируем задачи по квадрантам Эйзенхауэра
-    val quadrant1Tasks = tasks.filter { it.eisenhowerQuadrant == 1 } // Важные и срочные
-    val quadrant2Tasks = tasks.filter { it.eisenhowerQuadrant == 2 } // Важные, но несрочные
-    val quadrant3Tasks = tasks.filter { it.eisenhowerQuadrant == 3 } // Неважные, но срочные
-    val quadrant4Tasks = tasks.filter { it.eisenhowerQuadrant == 4 } // Неважные и несрочные
-    val unassignedTasks = tasks.filter { it.eisenhowerQuadrant == null } // Без квадранта
+    // Преобразуем даты задач в LocalDate для сравнения
+    val today = LocalDate.now()
+    val twoDaysLater = today.plusDays(2)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Заголовок
-        Text(
-            text = stringResource(R.string.eisenhower_matrix),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
-        )
+    // Группируем задачи по срочности и важности
+    val urgentImportant = tasks.filter { task ->
+        task.priority == TaskPriority.HIGH &&
+                (task.dueDate?.let { dueDate ->
+                    val taskDate = Instant.ofEpochMilli(dueDate)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    taskDate.isBefore(twoDaysLater)
+                } ?: false)
+    }
 
-        // Матрица 2x2
+    val nonUrgentImportant = tasks.filter { task ->
+        task.priority == TaskPriority.HIGH &&
+                (task.dueDate?.let { dueDate ->
+                    val taskDate = Instant.ofEpochMilli(dueDate)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    taskDate.isAfter(twoDaysLater.minusDays(1))
+                } ?: true)
+    }
+
+    val urgentNotImportant = tasks.filter { task ->
+        task.priority != TaskPriority.HIGH &&
+                (task.dueDate?.let { dueDate ->
+                    val taskDate = Instant.ofEpochMilli(dueDate)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    taskDate.isBefore(twoDaysLater)
+                } ?: false)
+    }
+
+    val nonUrgentNotImportant = tasks.filter { task ->
+        task.priority != TaskPriority.HIGH &&
+                (task.dueDate?.let { dueDate ->
+                    val taskDate = Instant.ofEpochMilli(dueDate)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    taskDate.isAfter(twoDaysLater.minusDays(1))
+                } ?: true)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp)
+    ) {
         Row(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
+                .weight(1f)
         ) {
-            // Левая колонка (срочные)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            ) {
-                // Квадрант 1: Важно и срочно
-                EisenhowerQuadrant(
-                    title = stringResource(R.string.important_urgent),
-                    tasks = quadrant1Tasks,
-                    backgroundColor = Color(0xFFFFCDD2), // Легкий красный
-                    onTaskClick = onTaskClick,
-                    onTaskStatusChange = onTaskStatusChange,
-                    onTaskDelete = onTaskDelete,
-                    modifier = Modifier.weight(1f)
-                )
+            // Срочные и важные
+            EisenhowerQuadrant(
+                title = stringResource(R.string.urgent_important),
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+                tasks = urgentImportant,
+                onTaskClick = onTaskClick,
+                onTaskStatusChange = onTaskStatusChange,
+                onTaskDelete = onTaskDelete,
+                modifier = Modifier.weight(1f)
+            )
 
-                // Квадрант 3: Неважно, но срочно
-                EisenhowerQuadrant(
-                    title = stringResource(R.string.not_important_urgent),
-                    tasks = quadrant3Tasks,
-                    backgroundColor = Color(0xFFFFE0B2), // Легкий оранжевый
-                    onTaskClick = onTaskClick,
-                    onTaskStatusChange = onTaskStatusChange,
-                    onTaskDelete = onTaskDelete,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Правая колонка (несрочные)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            ) {
-                // Квадрант 2: Важно, но несрочно
-                EisenhowerQuadrant(
-                    title = stringResource(R.string.important_not_urgent),
-                    tasks = quadrant2Tasks,
-                    backgroundColor = Color(0xFFE8F5E9), // Легкий зеленый
-                    onTaskClick = onTaskClick,
-                    onTaskStatusChange = onTaskStatusChange,
-                    onTaskDelete = onTaskDelete,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Квадрант 4: Неважно и несрочно
-                EisenhowerQuadrant(
-                    title = stringResource(R.string.not_important_not_urgent),
-                    tasks = quadrant4Tasks,
-                    backgroundColor = Color(0xFFE1F5FE), // Легкий синий
-                    onTaskClick = onTaskClick,
-                    onTaskStatusChange = onTaskStatusChange,
-                    onTaskDelete = onTaskDelete,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            // Не срочные, но важные
+            EisenhowerQuadrant(
+                title = stringResource(R.string.not_urgent_important),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                tasks = nonUrgentImportant,
+                onTaskClick = onTaskClick,
+                onTaskStatusChange = onTaskStatusChange,
+                onTaskDelete = onTaskDelete,
+                modifier = Modifier.weight(1f)
+            )
         }
 
-        // Задачи без назначенного квадранта
-        if (unassignedTasks.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.unassigned_tasks),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(8.dp)
-                )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            // Срочные, но не важные
+            EisenhowerQuadrant(
+                title = stringResource(R.string.urgent_not_important),
+                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
+                tasks = urgentNotImportant,
+                onTaskClick = onTaskClick,
+                onTaskStatusChange = onTaskStatusChange,
+                onTaskDelete = onTaskDelete,
+                modifier = Modifier.weight(1f)
+            )
 
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                ) {
-                    items(unassignedTasks) { task ->
-                        TaskItemCompact(
-                            task = task,
-                            onTaskClick = onTaskClick,
-                            onTaskStatusChange = onTaskStatusChange
-                        )
-                    }
-                }
-            }
+            // Не срочные и не важные
+            EisenhowerQuadrant(
+                title = stringResource(R.string.not_urgent_not_important),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                tasks = nonUrgentNotImportant,
+                onTaskClick = onTaskClick,
+                onTaskStatusChange = onTaskStatusChange,
+                onTaskDelete = onTaskDelete,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -987,8 +1322,8 @@ fun EisenhowerMatrix(
 @Composable
 fun EisenhowerQuadrant(
     title: String,
+    color: Color,
     tasks: List<Task>,
-    backgroundColor: Color,
     onTaskClick: (String) -> Unit,
     onTaskStatusChange: (String, Boolean) -> Unit,
     onTaskDelete: (String) -> Unit,
@@ -996,38 +1331,54 @@ fun EisenhowerQuadrant(
 ) {
     Card(
         modifier = modifier
-            .fillMaxSize()
-            .padding(4.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+            .padding(4.dp)
+            .fillMaxSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = color
+        ),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Заголовок квадранта
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(8.dp)
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.3f))
+                    .padding(8.dp),
+                textAlign = TextAlign.Center
             )
 
+            // Список задач
             if (tasks.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = stringResource(R.string.no_tasks),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(4.dp)
+                    contentPadding = PaddingValues(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tasks) { task ->
-                        TaskItemCompact(
+                        CompactTaskItem(
                             task = task,
-                            onTaskClick = onTaskClick,
-                            onTaskStatusChange = onTaskStatusChange
+                            onClick = { onTaskClick(task.id) },
+                            onStatusChange = { isCompleted -> onTaskStatusChange(task.id, isCompleted) }
                         )
                     }
                 }
@@ -1037,331 +1388,245 @@ fun EisenhowerQuadrant(
 }
 
 @Composable
-fun TaskItemCompact(
+fun CompactTaskItem(
     task: Task,
-    onTaskClick: (String) -> Unit,
-    onTaskStatusChange: (String, Boolean) -> Unit
+    onClick: () -> Unit,
+    onStatusChange: (Boolean) -> Unit
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onTaskClick(task.id) }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 1.dp
+        )
     ) {
-        Checkbox(
-            checked = task.status == TaskStatus.COMPLETED,
-            onCheckedChange = { isChecked ->
-                onTaskStatusChange(task.id, isChecked)
-            },
-            modifier = Modifier.padding(end = 8.dp)
-        )
-
-        Text(
-            text = task.title,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .alpha(if (task.status == TaskStatus.COMPLETED) 0.6f else 1f)
-        )
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = task.status == TaskStatus.COMPLETED,
+                onCheckedChange = { isChecked -> onStatusChange(isChecked) },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = when (task.priority) {
+                        TaskPriority.HIGH -> MaterialTheme.colorScheme.error
+                        TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                        TaskPriority.LOW -> MaterialTheme.colorScheme.primary
+                    }
+                )
+            )
+
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (task.status == TaskStatus.COMPLETED)
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                else
+                    MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (task.status == TaskStatus.COMPLETED)
+                    TextDecoration.LineThrough
+                else
+                    null,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
-@Composable
-fun FilterDialog(
-    onDismiss: () -> Unit,
-    currentStatus: TaskStatus?,
-    onStatusSelected: (TaskStatus?) -> Unit,
-    currentPriority: TaskPriority?,
-    onPrioritySelected: (TaskPriority?) -> Unit,
-    tags: List<Tag>,
-    selectedTagIds: List<String>,
-    onTagSelected: (String) -> Unit,
-    searchQuery: String,
-    onSearchQueryChanged: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(text = stringResource(R.string.filter_tasks))
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                // Поле поиска
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChanged,
-                    label = { Text(stringResource(R.string.search)) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    singleLine = true
-                )
-
-                // Фильтр по статусу
-                Text(
-                    text = stringResource(R.string.status),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                StatusFilterChips(
-                    currentStatus = currentStatus,
-                    onStatusSelected = onStatusSelected
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Фильтр по приоритету
-                Text(
-                    text = stringResource(R.string.priority),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                PriorityFilterChips(
-                    currentPriority = currentPriority,
-                    onPrioritySelected = onPrioritySelected
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Фильтр по тегам
-                if (tags.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.tags),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    FlowRow(
-                        mainAxisSpacing = 8.dp,
-                        crossAxisSpacing = 8.dp,
-                    ) {
-                        tags.forEach { tag ->
-                            val isSelected = selectedTagIds.contains(tag.id)
-
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { onTagSelected(tag.id) },
-                                label = { Text(tag.name) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = tag.color?.toColor()?.copy(alpha = 0.2f)
-                                        ?: MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.done))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = {
-                onStatusSelected(null)
-                onPrioritySelected(null)
-                onSearchQueryChanged("")
-            }) {
-                Text(stringResource(R.string.reset))
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatusFilterChips(
     currentStatus: TaskStatus?,
     onStatusSelected: (TaskStatus?) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
+    LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        FilterChip(
-            selected = currentStatus == TaskStatus.ACTIVE,
-            onClick = { onStatusSelected(
-                if (currentStatus == TaskStatus.ACTIVE) null else TaskStatus.ACTIVE
-            ) },
-            label = { Text(stringResource(R.string.active)) },
-            leadingIcon = if (currentStatus == TaskStatus.ACTIVE) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
+        // Все задачи
+        item {
+            FilterChip(
+                selected = currentStatus == null,
+                onClick = { onStatusSelected(null) },
+                label = { Text(stringResource(R.string.all)) }
+            )
+        }
 
-        FilterChip(
-            selected = currentStatus == TaskStatus.COMPLETED,
-            onClick = { onStatusSelected(
-                if (currentStatus == TaskStatus.COMPLETED) null else TaskStatus.COMPLETED
-            ) },
-            label = { Text(stringResource(R.string.completed)) },
-            leadingIcon = if (currentStatus == TaskStatus.COMPLETED) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
+        // Активные задачи
+        item {
+            FilterChip(
+                selected = currentStatus == TaskStatus.ACTIVE,
+                onClick = { onStatusSelected(TaskStatus.ACTIVE) },
+                label = { Text(stringResource(R.string.active)) }
+            )
+        }
 
-        FilterChip(
-            selected = currentStatus == TaskStatus.ARCHIVED,
-            onClick = { onStatusSelected(
-                if (currentStatus == TaskStatus.ARCHIVED) null else TaskStatus.ARCHIVED
-            ) },
-            label = { Text(stringResource(R.string.archived)) },
-            leadingIcon = if (currentStatus == TaskStatus.ARCHIVED) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
+        // Завершенные задачи
+        item {
+            FilterChip(
+                selected = currentStatus == TaskStatus.COMPLETED,
+                onClick = { onStatusSelected(TaskStatus.COMPLETED) },
+                label = { Text(stringResource(R.string.completed)) }
+            )
+        }
+
+        // Архивные задачи
+        item {
+            FilterChip(
+                selected = currentStatus == TaskStatus.ARCHIVED,
+                onClick = { onStatusSelected(TaskStatus.ARCHIVED) },
+                label = { Text(stringResource(R.string.archived)) }
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PriorityFilterChips(
     currentPriority: TaskPriority?,
     onPrioritySelected: (TaskPriority?) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
+    LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        FilterChip(
-            selected = currentPriority == TaskPriority.HIGH,
-            onClick = { onPrioritySelected(
-                if (currentPriority == TaskPriority.HIGH) null else TaskPriority.HIGH
-            ) },
-            label = { Text(stringResource(R.string.high)) },
-            leadingIcon = if (currentPriority == TaskPriority.HIGH) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
+        // Все приоритеты
+        item {
+            FilterChip(
+                selected = currentPriority == null,
+                onClick = { onPrioritySelected(null) },
+                label = { Text(stringResource(R.string.all)) }
+            )
+        }
 
-        FilterChip(
-            selected = currentPriority == TaskPriority.MEDIUM,
-            onClick = { onPrioritySelected(
-                if (currentPriority == TaskPriority.MEDIUM) null else TaskPriority.MEDIUM
-            ) },
-            label = { Text(stringResource(R.string.medium)) },
-            leadingIcon = if (currentPriority == TaskPriority.MEDIUM) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
+        // Высокий приоритет
+        item {
+            FilterChip(
+                selected = currentPriority == TaskPriority.HIGH,
+                onClick = { onPrioritySelected(TaskPriority.HIGH) },
+                label = { Text(stringResource(R.string.high)) },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(MaterialTheme.colorScheme.error, CircleShape)
+                    )
+                }
+            )
+        }
 
-        FilterChip(
-            selected = currentPriority == TaskPriority.LOW,
-            onClick = { onPrioritySelected(
-                if (currentPriority == TaskPriority.LOW) null else TaskPriority.LOW
-            ) },
-            label = { Text(stringResource(R.string.low)) },
-            leadingIcon = if (currentPriority == TaskPriority.LOW) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else null
-        )
-    }
-}
+        // Средний приоритет
+        item {
+            FilterChip(
+                selected = currentPriority == TaskPriority.MEDIUM,
+                onClick = { onPrioritySelected(TaskPriority.MEDIUM) },
+                label = { Text(stringResource(R.string.medium)) },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                    )
+                }
+            )
+        }
 
-// Вспомогательные функции
-
-@Composable
-fun getPriorityColor(priority: TaskPriority): Color {
-    return when (priority) {
-        TaskPriority.HIGH -> Color(0xFFF44336) // Красный
-        TaskPriority.MEDIUM -> Color(0xFFFF9800) // Оранжевый
-        TaskPriority.LOW -> Color(0xFF4CAF50) // Зеленый
-    }
-}
-
-@Composable
-fun formatDateHeader(date: LocalDate): String {
-    val today = LocalDate.now()
-    val tomorrow = today.plusDays(1)
-    val yesterday = today.minusDays(1)
-
-    return when (date) {
-        today -> stringResource(R.string.today)
-        tomorrow -> stringResource(R.string.tomorrow)
-        yesterday -> stringResource(R.string.yesterday)
-        else -> date.format(DateTimeFormatter.ofPattern("d MMMM"))
+        // Низкий приоритет
+        item {
+            FilterChip(
+                selected = currentPriority == TaskPriority.LOW,
+                onClick = { onPrioritySelected(TaskPriority.LOW) },
+                label = { Text(stringResource(R.string.low)) },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun FlowRow(
+    modifier: Modifier = Modifier,
     mainAxisSpacing: Dp = 0.dp,
     crossAxisSpacing: Dp = 0.dp,
     content: @Composable () -> Unit
 ) {
     Layout(
-        content = content
+        content = content,
+        modifier = modifier
     ) { measurables, constraints ->
-        val rows = mutableListOf<MeasuredRow>()
-        val maxWidth = constraints.maxWidth
+        val sequences = mutableListOf<List<Measurable>>()
+        val crossAxisSizes = mutableListOf<Int>()
+        val crossAxisPositions = mutableListOf<Int>()
 
-        var rowCurrentWidth = 0
-        var rowItems = mutableListOf<Pair<Measurable, androidx.compose.ui.layout.Placeable>>()
+        var mainAxisSpace = 0
+        var crossAxisSpace = 0
 
-        // Измеряем каждый элемент
-        measurables.forEach { measurable ->
-            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth))
+        val currentSequence = mutableListOf<Measurable>()
+        var currentMainAxisSize = 0
+        var currentCrossAxisSize = 0
 
-            val wouldExceedMaxWidth = rowCurrentWidth + placeable.width +
-                    if (rowItems.isEmpty()) 0 else mainAxisSpacing.roundToPx()
+        // Разбиваем на строки
+        for (i in measurables.indices) {
+            val measurable = measurables[i]
 
-            if (wouldExceedMaxWidth > maxWidth) {
-                // Не хватает места в текущем ряду, создаем новый ряд
-                rows.add(MeasuredRow(rowItems.toList(), rowCurrentWidth))
-                rowItems = mutableListOf()
-                rowCurrentWidth = 0
+            // Измеряем элемент
+            val placeable = measurable.measure(constraints)
+
+            // Если не помещается в текущую строку - начинаем новую
+            if (currentSequence.isNotEmpty() && currentMainAxisSize + mainAxisSpacing.roundToPx() + placeable.width > constraints.maxWidth) {
+                sequences.add(currentSequence.toList())
+                crossAxisSizes.add(currentCrossAxisSize)
+                crossAxisPositions.add(crossAxisSpace)
+
+                crossAxisSpace += currentCrossAxisSize + crossAxisSpacing.roundToPx()
+
+                currentSequence.clear()
+                currentMainAxisSize = 0
+                currentCrossAxisSize = 0
             }
 
-            // Добавляем элемент в текущий ряд
-            rowItems.add(measurable to placeable)
-            rowCurrentWidth += placeable.width + if (rowCurrentWidth == 0) 0 else mainAxisSpacing.roundToPx()
+            // Добавляем в текущую строку
+            currentSequence.add(measurable)
+            currentMainAxisSize += placeable.width + if (currentSequence.size > 1) mainAxisSpacing.roundToPx() else 0
+            currentCrossAxisSize = maxOf(currentCrossAxisSize, placeable.height)
         }
 
-        // Добавляем последний ряд, если он не пустой
-        if (rowItems.isNotEmpty()) {
-            rows.add(MeasuredRow(rowItems.toList(), rowCurrentWidth))
+        // Добавляем последнюю строку, если она не пуста
+        if (currentSequence.isNotEmpty()) {
+            sequences.add(currentSequence.toList())
+            crossAxisSizes.add(currentCrossAxisSize)
+            crossAxisPositions.add(crossAxisSpace)
+            crossAxisSpace += currentCrossAxisSize
         }
 
-        // Вычисляем общую высоту
-        val height = rows.sumOf { row ->
-            row.items.maxOfOrNull { it.second.height } ?: 0
-        } + (rows.size - 1).coerceAtLeast(0) * crossAxisSpacing.roundToPx()
+        val layoutHeight = crossAxisSpace
 
-        // Устанавливаем размер layout
-        layout(maxWidth, height.coerceAtMost(constraints.maxHeight)) {
-            var yPosition = 0
+        // Размещаем элементы
+        layout(constraints.maxWidth, layoutHeight) {
+            sequences.forEachIndexed { i, seq ->
+                var mainAxisPos = 0
 
-            // Размещаем каждый ряд
-            rows.forEach { row ->
-                var xPosition = 0
-                val rowHeight = row.items.maxOfOrNull { it.second.height } ?: 0
-
-                // Размещаем элементы внутри ряда
-                row.items.forEach { (_, placeable) ->
-                    placeable.placeRelative(xPosition, yPosition)
-                    xPosition += placeable.width + mainAxisSpacing.roundToPx()
+                seq.forEach { measurable ->
+                    val placeable = measurable.measure(constraints)
+                    placeable.place(
+                        x = mainAxisPos,
+                        y = crossAxisPositions[i]
+                    )
+                    mainAxisPos += placeable.width + mainAxisSpacing.roundToPx()
                 }
-
-                yPosition += rowHeight + crossAxisSpacing.roundToPx()
             }
         }
     }
 }
-
-private class MeasuredRow(
-    val items: List<Pair<Measurable, androidx.compose.ui.layout.Placeable>>,
-    val width: Int
-)

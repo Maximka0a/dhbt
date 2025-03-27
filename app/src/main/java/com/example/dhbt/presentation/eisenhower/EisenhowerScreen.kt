@@ -37,10 +37,9 @@ import androidx.navigation.NavController
 import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import kotlinx.coroutines.launch
-import org.threeten.bp.Instant
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

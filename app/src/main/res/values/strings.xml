@@ -328,7 +328,6 @@
     <string name="clear_filters">Сбросить фильтры</string>
 
 
-
     <!-- Habits Screen -->
     <string name="view_mode">Режим просмотра</string>
     <string name="view_list_description">Подробный список с кнопками действий</string>
@@ -346,7 +345,6 @@
     <string name="previous_week">Предыдущая неделя</string>
     <string name="next_week">Следующая неделя</string>
     <string name="mark_as_completed">Отметить как выполненное</string>
-
 
 
     <!-- Общие -->
@@ -455,4 +453,72 @@
     <string name="pomodoro_count">%d помидоров</string>
     <string name="start_pomodoro_session">Начать помидор</string>
     <string name="confirm_delete_task">Удалить задачу?</string>
+    <!-- Month names -->
+    <string name="january">Январь</string>
+    <string name="february">Февраль</string>
+    <string name="march">Март</string>
+    <string name="april">Апрель</string>
+    <string name="may">Май</string>
+    <string name="june">Июнь</string>
+    <string name="july">Июль</string>
+    <string name="august">Август</string>
+    <string name="september">Сентябрь</string>
+    <string name="october">Октябрь</string>
+    <string name="november">Ноябрь</string>
+    <string name="december">Декабрь</string>
+    <string name="error">Ошибка</string>
+    <string name="share">Поделиться</string>
+    <string name="filters">Фильтры</string>
+    <string name="clear_all">Очистить всё</string>
+
+    <string name="all_categories">Все категории</string>
+
+    <!-- Строки для экрана деталей привычки -->
+    <string name="habit">Привычка</string>
+    <string name="mark_habit">Отметить выполнение привычки</string>
+    <string name="mark">Отметить</string>
+    <string name="delete_habit_confirmation">Удалить привычку?</string>
+    <string name="delete_habit_confirmation_message">Вы уверены, что хотите удалить привычку «%1$s»? Это действие невозможно отменить.</string>
+    <string name="habit_deleted">Привычка удалена</string>
+    <string name="error_title">Что-то пошло не так</string>
+    <string name="return_back">Вернуться назад</string>
+
+    <string name="completion_history">История выполнения</string>
+    <string name="daily_progress">Прогресс по дням</string>
+    <string name="week">Неделя</string>
+    <string name="month">Месяц</string>
+    <string name="information">Информация</string>
+    <string name="target">Цель</string>
+
+    <string name="share_habit">Поделиться привычкой</string>
+    <string name="unarchive_habit">Восстановить из архива</string>
+
+    <string name="current_streak">Текущая серия</string>
+    <string name="increment">Увеличить</string>
+    <string name="decrement">Уменьшить</string>
+
+    <!-- Периодичность привычек -->
+    <string name="specific_days">По дням: %1$s</string>
+    <string name="times_per_week">%1$d раз в неделю</string>
+    <string name="times_per_month">%1$d раз в месяц</string>
+    <string name="no_habits_match_filters">Ни одна привычка не соответствует вашим фильтрам</string>
+    <string name="try_changing_filters">Попробуйте настроить фильтры, чтобы увидеть больше привычек</string>
+    <string name="create_your_first_habit">Создайте свою первую привычку, чтобы начать отслеживать прогресс</string>
+    <string name="new_habit">Новая привычка</string>
+
+
+    <string name="search_tasks">Поиск задач...</string>
+
+    <string name="close_search">Закрыть поиск</string>
+
+
+    <string name="overdue">Просрочено</string>
+
+
+    <!-- Матрица Эйзенхауэра -->
+    <string name="urgent_important">Срочно и важно</string>
+    <string name="not_urgent_important">Несрочно, но важно</string>
+    <string name="urgent_not_important">Срочно, но неважно</string>
+    <string name="not_urgent_not_important">Несрочно и неважно</string>
+    <string name="no_search_results">Нет результатов для \"%1$s\"</string>
 </resources>

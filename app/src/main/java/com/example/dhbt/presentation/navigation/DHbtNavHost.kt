@@ -94,6 +94,7 @@ fun DHbtNavHost(
             val habitData = backStackEntry.toRoute<HabitEdit>()
             EditHabitScreen(
                 navController = navController
+                // habitId is now automatically passed as null for creation
             )
         }
 

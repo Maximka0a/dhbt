@@ -1,46 +1,143 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.example.dhbt.presentation.habit.list
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.FilterListOff
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.SentimentDissatisfied
+import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ElevatedFilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.dhbt.R
 import com.example.dhbt.domain.model.Category
-import com.example.dhbt.presentation.habit.components.*
+import com.example.dhbt.domain.model.Habit
+import com.example.dhbt.domain.model.HabitType
 import com.example.dhbt.presentation.navigation.HabitDetail
 import com.example.dhbt.presentation.navigation.HabitEdit
+import com.example.dhbt.presentation.util.DayOfWeekLocalization
+import com.example.dhbt.presentation.util.MonthLocalization
+import com.example.dhbt.presentation.util.parseColor
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.Month
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
+    ExperimentalAnimationApi::class)
 @Composable
 fun HabitsScreen(
     navController: NavController,
@@ -52,327 +149,542 @@ fun HabitsScreen(
     val categories by viewModel.categories.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val overallProgress by viewModel.overallProgress.collectAsState()
+    val weekStartDate by viewModel.weekStartDate.collectAsState()
 
-    // Состояния UI
+    // State for UI interactions
+    var expandedSection by remember { mutableStateOf<ExpandableSection?>(null) }
+    var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var isSearchBarVisible by remember { mutableStateOf(false) }
-    var isSortingListVisible by remember { mutableStateOf(false) }
-    var isViewModesVisible by remember { mutableStateOf(false) }
     var areCategoriesVisible by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
 
-    // Для индикации активных кнопок действий
-    var activeAction by remember { mutableStateOf<ActionType?>(null) }
-
-    // Функция для переключения активного действия
-    fun toggleAction(action: ActionType) {
-        activeAction = if (activeAction == action) null else action
-
-        // Обновляем связанные состояния
-        isSearchBarVisible = activeAction == ActionType.SEARCH
-        isSortingListVisible = activeAction == ActionType.SORT
-        isViewModesVisible = activeAction == ActionType.VIEW_MODE
-    }
-
-    // Анимация прогресса
+    // Animation values - use derivedStateOf to avoid unnecessary animations
     val animatedProgress by animateFloatAsState(
         targetValue = overallProgress,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow
         ),
-        label = "overallProgress"
+        label = "progressAnimation"
     )
 
-    // Отслеживаем изменения в запросе поиска
+    // Update search query
     LaunchedEffect(searchQuery) {
-        viewModel.handleIntent(HabitsIntent.SetSearchQuery(searchQuery))
+        if (isSearchActive) {
+            viewModel.handleIntent(HabitsIntent.SetSearchQuery(searchQuery))
+        }
     }
 
-    // TopAppBar scroll behavior
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    // Scroll behavior for the top app bar
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val context = LocalContext.current
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.habits),
-                        style = MaterialTheme.typography.titleLarge
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                LargeTopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.habits),
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Progress indicator
+                            ProgressIndicator(
+                                progress = animatedProgress,
+                                size = 38.dp
+                            )
+                        }
+                    },
+                    actions = {
+                        // Search button
+                        IconButton(
+                            onClick = {
+                                isSearchActive = !isSearchActive
+                                if (!isSearchActive) {
+                                    searchQuery = ""
+                                    viewModel.handleIntent(HabitsIntent.SetSearchQuery(""))
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isSearchActive) Icons.Filled.Close else Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.search),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Filter button
+                        IconButton(
+                            onClick = {
+                                expandedSection = if (expandedSection == ExpandableSection.FILTERS)
+                                    null else ExpandableSection.FILTERS
+                            }
+                        ) {
+                            Badge(
+                                modifier = Modifier.offset(x = 14.dp, y = (-10).dp),
+                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                contentColor = MaterialTheme.colorScheme.onTertiary
+                            ) {
+                                val filterCount = countActiveFilters(filterState)
+                                if (filterCount > 0) Text(filterCount.toString())
+                            }
+
+                            Icon(
+                                imageVector = Icons.Filled.FilterList,
+                                contentDescription = "Filters",
+                                tint = if (expandedSection == ExpandableSection.FILTERS)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // View mode button
+                        IconButton(
+                            onClick = {
+                                expandedSection = if (expandedSection == ExpandableSection.VIEW_MODES)
+                                    null else ExpandableSection.VIEW_MODES
+                            }
+                        ) {
+                            Icon(
+                                imageVector = when (uiState.viewMode) {
+                                    HabitViewMode.LIST -> Icons.Filled.ViewList
+                                    HabitViewMode.GRID -> Icons.Filled.GridView
+                                    HabitViewMode.CATEGORIES -> Icons.Filled.Category
+                                },
+                                contentDescription = stringResource(R.string.view_mode),
+                                tint = if (expandedSection == ExpandableSection.VIEW_MODES)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                     )
-                },
-                actions = {
-                    // Диаграмма общего прогресса
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp)
-                            .size(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp
+                )
+            },
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { navController.navigate(HabitEdit()) },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null
                         )
-
+                    },
+                    text = {
                         Text(
-                            text = "${(overallProgress * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = stringResource(R.string.new_habit),
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(HabitEdit()) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_habit))
+                    },
+                    expanded = true,
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
+                )
             }
-        }
-    ) { paddingValues ->
-        val lazyListState = rememberLazyListState()
-        val lazyGridState = rememberLazyGridState()
-
-        Box(modifier = Modifier.padding(paddingValues)) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
             ) {
-                // Календарь для выбора даты
-                HabitCalendarView(
-                    selectedDate = selectedDate,
-                    habits = habits,
-                    onDateSelected = { date ->
-                        viewModel.handleIntent(HabitsIntent.SetSelectedDate(date))
-                    },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-
-                // Панель с фильтрами статуса и действиями
-                ImprovedFilterStatusBar(
-                    statusFilter = filterState.statusFilter,
-                    onStatusFilterChanged = { filter ->
-                        viewModel.handleIntent(HabitsIntent.SetStatusFilter(filter))
-                    },
-                    activeAction = activeAction,
-                    onActionSelected = { action -> toggleAction(action) },
-                    onCategoriesToggle = { areCategoriesVisible = !areCategoriesVisible },
-                    areCategoriesVisible = areCategoriesVisible
-                )
-
-                // Анимированное поле поиска
-                AnimatedVisibility(
-                    visible = activeAction == ActionType.SEARCH,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text(stringResource(R.string.search_habits)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Очистить"
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-
-                // Анимированный список выбора режима просмотра
-                AnimatedVisibility(
-                    visible = activeAction == ActionType.VIEW_MODE,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    ImprovedViewModeSelector(
-                        currentMode = uiState.viewMode,
-                        onModeSelected = { mode ->
-                            viewModel.handleIntent(HabitsIntent.SetViewMode(mode))
-                            activeAction = null
-                        }
-                    )
-                }
-
-                // Анимированный список выбора сортировки
-                AnimatedVisibility(
-                    visible = activeAction == ActionType.SORT,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    SortOrderSelector(
-                        currentSortOrder = filterState.sortOrder,
-                        onSortSelected = { sortOrder ->
-                            viewModel.handleIntent(HabitsIntent.SetSortOrder(sortOrder))
-                        }
-                    )
-                }
-
-                // Категории - показываем, только если включено areCategoriesVisible
-                AnimatedVisibility(
-                    visible = areCategoriesVisible,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    CategoriesFilter(
-                        categories = categories,
-                        selectedCategoryId = filterState.selectedCategoryId,
-                        onCategorySelected = { categoryId ->
-                            viewModel.handleIntent(HabitsIntent.SelectCategory(categoryId))
-                        }
-                    )
-                }
-
-                // Основной контент в зависимости от режима просмотра
-                when (uiState.viewMode) {
-                    HabitViewMode.LIST -> {
-                        // Список привычек
-                        if (habits.isEmpty()) {
-                            EmptyHabitsView(
-                                filterState = filterState,
-                                onCreateHabit = { navController.navigate(HabitEdit()) },
-                                onClearFilters = { viewModel.handleIntent(HabitsIntent.ClearFilters) }
-                            )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                state = lazyListState,
-                                contentPadding = PaddingValues(
-                                    start = 8.dp,
-                                    end = 8.dp,
-                                    top = 4.dp,
-                                    bottom = 80.dp
-                                ),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(
-                                    items = habits,
-                                    key = { it.habit.id }
-                                ) { habitWithProgress ->
-                                    HabitListItem(
-                                        habitWithProgress = habitWithProgress,
-                                        onToggleCompletion = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.ToggleHabitCompletion(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        onIncrement = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.IncrementHabitProgress(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        onDecrement = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.DecrementHabitProgress(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        onClick = {
-                                            navController.navigate(HabitDetail(habitWithProgress.habit.id))
-                                        },
-                                        onEdit = {
-                                            navController.navigate(HabitEdit(habitWithProgress.habit.id))
-                                        },
-                                        onArchive = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.ArchiveHabit(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        modifier = Modifier.animateItemPlacement()
-                                    )
-                                }
-                            }
-                        }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Search bar
+                    AnimatedVisibility(
+                        visible = isSearchActive,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        SearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onClear = {
+                                searchQuery = ""
+                                viewModel.handleIntent(HabitsIntent.SetSearchQuery(""))
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
                     }
-                    HabitViewMode.GRID -> {
-                        // Сетка привычек
-                        if (habits.isEmpty()) {
-                            EmptyHabitsView(
-                                filterState = filterState,
-                                onCreateHabit = { navController.navigate(HabitEdit()) },
-                                onClearFilters = { viewModel.handleIntent(HabitsIntent.ClearFilters) }
-                            )
-                        } else {
-                            LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = 120.dp),
-                                modifier = Modifier.fillMaxSize(),
-                                state = lazyGridState,
-                                contentPadding = PaddingValues(
-                                    start = 8.dp,
-                                    end = 8.dp,
-                                    top = 4.dp,
-                                    bottom = 80.dp
-                                ),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                items(
-                                    items = habits,
-                                    key = { it.habit.id }
-                                ) { habitWithProgress ->
-                                    HabitGridItem(
-                                        habitWithProgress = habitWithProgress,
-                                        onToggleCompletion = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.ToggleHabitCompletion(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        onIncrement = {
-                                            viewModel.handleIntent(
-                                                HabitsIntent.IncrementHabitProgress(habitWithProgress.habit.id)
-                                            )
-                                        },
-                                        onClick = {
-                                            navController.navigate(HabitDetail(habitWithProgress.habit.id))
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    HabitViewMode.CATEGORIES -> {
-                        // Группировка привычек по категориям
-                        CategoryGroupedHabits(
-                            habits = habits,
-                            categories = categories,
+
+                    // Expandable filter section
+                    AnimatedVisibility(
+                        visible = expandedSection == ExpandableSection.FILTERS,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        FilterPanel(
                             filterState = filterState,
-                            onToggleCompletion = { habitId ->
-                                viewModel.handleIntent(HabitsIntent.ToggleHabitCompletion(habitId))
+                            onStatusFilterChanged = { filter ->
+                                viewModel.handleIntent(HabitsIntent.SetStatusFilter(filter))
                             },
-                            onIncrement = { habitId ->
-                                viewModel.handleIntent(HabitsIntent.IncrementHabitProgress(habitId))
-                            },
-                            onDecrement = { habitId ->
-                                viewModel.handleIntent(HabitsIntent.DecrementHabitProgress(habitId))
-                            },
-                            onHabitClick = { habitId ->
-                                navController.navigate(HabitDetail(habitId))
-                            },
-                            onCreateHabit = {
-                                navController.navigate(HabitEdit())
+                            onSortOrderChanged = { sortOrder ->
+                                viewModel.handleIntent(HabitsIntent.SetSortOrder(sortOrder))
                             },
                             onClearFilters = {
                                 viewModel.handleIntent(HabitsIntent.ClearFilters)
+                                expandedSection = null
+                            },
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                        )
+                    }
+
+                    // Expandable view mode section
+                    AnimatedVisibility(
+                        visible = expandedSection == ExpandableSection.VIEW_MODES,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        ViewModePanel(
+                            currentMode = uiState.viewMode,
+                            onModeSelected = { mode ->
+                                viewModel.handleIntent(HabitsIntent.SetViewMode(mode))
+                                expandedSection = null
+                                scope.launch {
+                                    delay(300) // Small delay for better UX
+                                }
+                            },
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                        )
+                    }
+
+                    // Date selector - enhanced with week navigation
+                    EnhancedDateSelector(
+                        selectedDate = selectedDate,
+                        weekStartDate = weekStartDate,
+                        onDateSelected = { date ->
+                            viewModel.handleIntent(HabitsIntent.SetSelectedDate(date))
+                        },
+                        onPreviousWeek = {
+                            viewModel.handleIntent(HabitsIntent.NavigateToPreviousWeek)
+                        },
+                        onNextWeek = {
+                            viewModel.handleIntent(HabitsIntent.NavigateToNextWeek)
+                        },
+                        onJumpToToday = {
+                            viewModel.handleIntent(HabitsIntent.JumpToCurrentWeek)
+                        },
+                        habits = habits,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+
+                    // Category tabs - only if there are categories and the feature is enabled
+                    if (categories.isNotEmpty() && areCategoriesVisible) {
+                        CategoryTabs(
+                            categories = categories,
+                            selectedCategoryId = filterState.selectedCategoryId,
+                            onCategorySelected = { categoryId ->
+                                viewModel.handleIntent(HabitsIntent.SelectCategory(categoryId))
+                            },
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+
+                    // Main content area
+                    Box(modifier = Modifier.weight(1f)) {
+                        // Show appropriate content based on view mode
+                        when {
+                            habits.isEmpty() -> {
+                                EmptyStateView(
+                                    filterState = filterState,
+                                    onCreateHabit = { navController.navigate(HabitEdit()) },
+                                    onClearFilters = {
+                                        viewModel.handleIntent(HabitsIntent.ClearFilters)
+                                        searchQuery = ""
+                                    }
+                                )
                             }
+                            uiState.viewMode == HabitViewMode.LIST -> {
+                                OptimizedHabitListView(
+                                    habits = habits,
+                                    onHabitClick = { habitId ->
+                                        navController.navigate(HabitDetail(habitId))
+                                    },
+                                    onToggleCompletion = { habitId ->
+                                        viewModel.handleIntent(HabitsIntent.ToggleHabitCompletion(habitId))
+                                    },
+                                    onIncrement = { habitId ->
+                                        viewModel.handleIntent(HabitsIntent.IncrementHabitProgress(habitId))
+                                    },
+                                    onDecrement = { habitId ->
+                                        viewModel.handleIntent(HabitsIntent.DecrementHabitProgress(habitId))
+                                    }
+                                )
+                            }
+                            uiState.viewMode == HabitViewMode.GRID -> {
+                                OptimizedHabitGridView(
+                                    habits = habits,
+                                    onHabitClick = { habitId ->
+                                        navController.navigate(HabitDetail(habitId))
+                                    },
+                                    onToggleCompletion = { habitId ->
+                                        viewModel.handleIntent(HabitsIntent.ToggleHabitCompletion(habitId))
+                                    }
+                                )
+                            }
+                            uiState.viewMode == HabitViewMode.CATEGORIES -> {
+                                OptimizedHabitCategoriesView(
+                                    habits = habits,
+                                    categories = categories,
+                                    onHabitClick = { habitId ->
+                                        navController.navigate(HabitDetail(habitId))
+                                    },
+                                    onToggleCompletion = { habitId ->
+                                        viewModel.handleIntent(HabitsIntent.ToggleHabitCompletion(habitId))
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun OptimizedHabitListView(
+    habits: List<HabitWithProgress>,
+    onHabitClick: (String) -> Unit,
+    onToggleCompletion: (String) -> Unit,
+    onIncrement: (String) -> Unit,
+    onDecrement: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val defaultColor = MaterialTheme.colorScheme.primary
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxSize()
+    ) {
+        items(
+            items = habits,
+            key = { it.habit.id } // Use the habit ID as key for stable item identity
+        ) { habitWithProgress ->
+            // Using key to avoid unnecessary recompositions
+            key(habitWithProgress.habit.id) {
+                val habit = habitWithProgress.habit
+                val progress = habitWithProgress.currentProgress
+
+                // Only calculate color once per item
+                val habitColor = remember(habit.id, habit.color) {
+                    parseColor(habit.color, defaultColor)
+                }
+
+                ModernHabitListItem(
+                    habit = habit,
+                    progress = progress,
+                    color = habitColor,
+                    onToggleCompletion = { onToggleCompletion(habit.id) },
+                    onIncrement = { onIncrement(habit.id) },
+                    onDecrement = { onDecrement(habit.id) },
+                    onClick = { onHabitClick(habit.id) },
+                    modifier = Modifier.animateItemPlacement()
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun OptimizedHabitGridView(
+    habits: List<HabitWithProgress>,
+    onHabitClick: (String) -> Unit,
+    onToggleCompletion: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val gridState = rememberLazyGridState()
+    val defaultColor =MaterialTheme.colorScheme.primary
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 160.dp),
+        state = gridState,
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp
+        ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxSize()
+    ) {
+        items(
+            items = habits,
+            key = { it.habit.id }
+        ) { habitWithProgress ->
+            // Using key to avoid unnecessary recompositions
+            key(habitWithProgress.habit.id) {
+                val habit = habitWithProgress.habit
+                val progress = habitWithProgress.currentProgress
+
+                // Only calculate color once per item
+                val habitColor = remember(habit.id, habit.color) {
+                    parseColor(habit.color, defaultColor)
+                }
+
+                ModernHabitGridItem(
+                    habit = habit,
+                    progress = progress,
+                    color = habitColor,
+                    onToggleCompletion = { onToggleCompletion(habit.id) },
+                    onClick = { onHabitClick(habit.id) },
+                    modifier = Modifier.animateItemPlacement()
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun OptimizedHabitCategoriesView(
+    habits: List<HabitWithProgress>,
+    categories: List<Category>,
+    onHabitClick: (String) -> Unit,
+    onToggleCompletion: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val defaultColor = MaterialTheme.colorScheme.primary
+    val uncategorizedText = stringResource(R.string.uncategorized)
+
+    // Group habits by category - using derivedStateOf to prevent recomposition when not needed
+    val habitsByCategory = remember(habits, categories) {
+        val result = mutableMapOf<String?, MutableList<HabitWithProgress>>()
+        // Initialize with all categories (even empty ones)
+        result[null] = mutableListOf() // For habits without category
+        categories.forEach { category ->
+            result[category.id] = mutableListOf()
+        }
+
+        // Fill with habits
+        habits.forEach { habitWithProgress ->
+            val categoryId = habitWithProgress.habit.categoryId
+            result[categoryId]?.add(habitWithProgress)
+        }
+
+        // Sort by category name and filter out empty categories
+        result.filterValues { it.isNotEmpty() }
+            .toSortedMap(compareBy { categoryId ->
+                if (categoryId == null) ""
+                else categories.find { it.id == categoryId }?.name ?: ""
+            })
+    }
+
+    // Create map of category colors for quick lookup
+    val categoryColorMap = remember(categories) {
+        categories.associateBy(
+            { it.id },
+            { parseColor(it.color, defaultColor) }
+        )
+    }
+
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        modifier = modifier.fillMaxSize()
+    ) {
+        habitsByCategory.forEach { (categoryId, habitsInCategory) ->
+            if (habitsInCategory.isNotEmpty()) {
+                // Get category information
+                val category = categories.find { it.id == categoryId }
+                val categoryName = category?.name ?: uncategorizedText
+                val categoryColor = categoryColorMap[categoryId] ?: defaultColor
+
+                item(key = "category_header_$categoryId") {
+                    // Category header
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .animateItemPlacement()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(categoryColor)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = categoryName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Divider(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+
+                        Text(
+                            text = "${habitsInCategory.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+
+                // Habits in this category
+                items(
+                    items = habitsInCategory,
+                    key = { "habit_${it.habit.id}" }
+                ) { habitWithProgress ->
+                    key(habitWithProgress.habit.id) {
+                        val habit = habitWithProgress.habit
+                        val progress = habitWithProgress.currentProgress
+
+                        // Only calculate color once per item
+                        val habitColor = remember(habit.id, habit.color) {
+                            parseColor(habit.color, defaultColor)
+                        }
+
+                        ModernHabitListItem(
+                            habit = habit,
+                            progress = progress,
+                            color = habitColor,
+                            onToggleCompletion = { onToggleCompletion(habit.id) },
+                            onIncrement = { /* Not needed in this view */ },
+                            onDecrement = { /* Not needed in this view */ },
+                            onClick = { onHabitClick(habit.id) },
+                            showControls = false,
+                            modifier = Modifier
+                                .animateItemPlacement()
+                                .padding(start = 20.dp) // Indentation to show hierarchy
                         )
                     }
                 }
@@ -381,242 +693,375 @@ fun HabitsScreen(
     }
 }
 
-// Тип действия для индикации активного состояния
-enum class ActionType {
-    SEARCH, SORT, VIEW_MODE
+
+@Composable
+private fun ModernHabitListItem(
+    habit: Habit,
+    progress: Float,
+    color: Color,
+    onToggleCompletion: () -> Unit,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    onClick: () -> Unit,
+    showControls: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    // Animation for completion state
+    val completionAlpha by animateFloatAsState(
+        targetValue = if (progress >= 1f) 1f else 0f,
+        label = "completionAlpha"
+    )
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Completion overlay
+            if (completionAlpha > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            color = color.copy(alpha = 0.1f * completionAlpha),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                )
+            }
+
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Emoji and color circle
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = color.copy(alpha = 0.15f),
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = color.copy(alpha = 0.3f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Text(
+                        text = habit.iconEmoji ?: "📝",
+                        fontSize = 20.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Habit details
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Title
+                    Text(
+                        text = habit.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Progress bar and streaks
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+
+                        Column {
+                            if (habit.type != HabitType.BINARY) {
+                                Text(
+                                    text = when (habit.type) {
+                                        HabitType.QUANTITY -> {
+                                            val current = (progress * (habit.targetValue ?: 1f)).toInt()
+                                            val target = habit.targetValue?.toInt() ?: 0
+                                            "$current/$target ${habit.unitOfMeasurement ?: ""}"
+                                        }
+                                        HabitType.TIME -> {
+                                            val current = (progress * (habit.targetValue ?: 1f)).toInt()
+                                            val target = habit.targetValue?.toInt() ?: 0
+                                            "$current/$target мин"
+                                        }
+                                        else -> ""
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            }
+                            // Progress bar
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = color,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Current streak
+                        if (habit.currentStreak > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.LocalFireDepartment,
+                                    contentDescription = null,
+                                    tint = color,
+                                    modifier = Modifier.size(16.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(2.dp))
+
+                                Text(
+                                    text = habit.currentStreak.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = color
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Binary habit: simple toggle button
+                if (habit.type == HabitType.BINARY) {
+                    IconButton(
+                        onClick = onToggleCompletion,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = if (progress >= 1f)
+                                    color.copy(alpha = 0.15f)
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (progress >= 1f)
+                                Icons.Filled.CheckCircle
+                            else
+                                Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = if (progress >= 1f) color else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                // Measurable habit: controls for incrementing/decrementing
+                else if (showControls) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Decrement button
+                        IconButton(
+                            onClick = onDecrement,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Remove,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // Increment button
+                        IconButton(
+                            onClick = onIncrement,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    color = color.copy(alpha = 0.15f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
-fun ImprovedFilterStatusBar(
-    statusFilter: HabitStatusFilter,
-    onStatusFilterChanged: (HabitStatusFilter) -> Unit,
-    activeAction: ActionType?,
-    onActionSelected: (ActionType) -> Unit,
-    onCategoriesToggle: () -> Unit,
-    areCategoriesVisible: Boolean,
+private fun ModernHabitGridItem(
+    habit: Habit,
+    progress: Float,
+    color: Color,
+    onToggleCompletion: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    // Animation for completion
+    val completionAlpha by animateFloatAsState(
+        targetValue = if (progress >= 1f) 1f else 0f,
+        label = "completionAlpha"
+    )
+
+    Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            // Верхняя строка с фильтрами и кнопками
-            Column {
-                // Улучшенная строка фильтров статуса (с вертикальной компоновкой при необходимости)
-                ImprovedFilterChips(
-                    selectedFilter = statusFilter,
-                    onFilterSelected = onStatusFilterChanged
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Completion overlay
+            if (completionAlpha > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            color = color.copy(alpha = 0.1f * completionAlpha),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            ) {
+                // Emoji
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(
+                            color = color.copy(alpha = 0.15f),
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = color.copy(alpha = 0.3f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Text(
+                        text = habit.iconEmoji ?: "📝",
+                        fontSize = 24.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Title
+                Text(
+                    text = habit.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Streaks (if any)
+                if (habit.currentStreak > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = color,
+                            modifier = Modifier.size(14.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(2.dp))
+
+                        Text(
+                            text = habit.currentStreak.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = color
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Progress bar
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = color,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Кнопки действий с индикацией активного состояния
-                ActionButtons(
-                    activeAction = activeAction,
-                    onActionSelected = onActionSelected,
-                    onCategoriesToggle = onCategoriesToggle,
-                    areCategoriesVisible = areCategoriesVisible
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ImprovedFilterChips(
-    selectedFilter: HabitStatusFilter,
-    onFilterSelected: (HabitStatusFilter) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Создаем более компактные фильтры-чипы
-        StatusChip(
-            filter = HabitStatusFilter.ACTIVE,
-            selected = selectedFilter == HabitStatusFilter.ACTIVE,
-            onSelected = onFilterSelected
-        )
-
-        StatusChip(
-            filter = HabitStatusFilter.ARCHIVED,
-            selected = selectedFilter == HabitStatusFilter.ARCHIVED,
-            onSelected = onFilterSelected
-        )
-
-        StatusChip(
-            filter = HabitStatusFilter.ALL,
-            selected = selectedFilter == HabitStatusFilter.ALL,
-            onSelected = onFilterSelected
-        )
-    }
-}
-
-@Composable
-fun StatusChip(
-    filter: HabitStatusFilter,
-    selected: Boolean,
-    onSelected: (HabitStatusFilter) -> Unit
-) {
-    val label = when(filter) {
-        HabitStatusFilter.ACTIVE -> stringResource(R.string.active)
-        HabitStatusFilter.ARCHIVED -> stringResource(R.string.archived)
-        HabitStatusFilter.ALL -> stringResource(R.string.all)
-    }
-
-    // Более компактный дизайн с вертикальной компоновкой при необходимости
-    Surface(
-        shape = RoundedCornerShape(100),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-        ),
-        modifier = Modifier.height(36.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .clickable { onSelected(filter) }
-                .padding(horizontal = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Для длинных слов используем меньший размер шрифта
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = if (label.length > 7) 12.sp else 14.sp
-                ),
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun ActionButtons(
-    activeAction: ActionType?,
-    onActionSelected: (ActionType) -> Unit,
-    onCategoriesToggle: () -> Unit,
-    areCategoriesVisible: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        // Кнопка поиска
-        ActionButton(
-            icon = Icons.Default.Search,
-            contentDescription = "Поиск",
-            isActive = activeAction == ActionType.SEARCH,
-            onClick = { onActionSelected(ActionType.SEARCH) }
-        )
-
-        // Кнопка сортировки
-        ActionButton(
-            icon = Icons.Default.Sort,
-            contentDescription = "Сортировка",
-            isActive = activeAction == ActionType.SORT,
-            onClick = { onActionSelected(ActionType.SORT) }
-        )
-
-        // Кнопка режима отображения
-        ActionButton(
-            icon = Icons.Default.ViewModule,
-            contentDescription = "Режим отображения",
-            isActive = activeAction == ActionType.VIEW_MODE,
-            onClick = { onActionSelected(ActionType.VIEW_MODE) }
-        )
-
-        // Кнопка переключения видимости категорий
-        ActionButton(
-            icon = if (areCategoriesVisible) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-            contentDescription = if (areCategoriesVisible) "Скрыть категории" else "Показать категории",
-            isActive = false, // Эта кнопка не имеет активного состояния
-            onClick = onCategoriesToggle
-        )
-    }
-}
-
-@Composable
-fun ActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    isActive: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        shape = CircleShape,
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun ImprovedViewModeSelector(
-    currentMode: HabitViewMode,
-    onModeSelected: (HabitViewMode) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val modes = listOf(
-        Triple(HabitViewMode.LIST, stringResource(R.string.view_list), Icons.Default.ViewList),
-        Triple(HabitViewMode.GRID, stringResource(R.string.view_grid), Icons.Default.GridView),
-        Triple(HabitViewMode.CATEGORIES, stringResource(R.string.view_categories), Icons.Default.Folder)
-    )
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Выбор режима отображения",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                modes.forEach { (mode, label, icon) ->
-                    val selected = mode == currentMode
-                    ImprovedViewModeOption(
-                        mode = mode,
-                        label = label,
-                        icon = icon,
-                        selected = selected,
-                        onSelected = { onModeSelected(mode) }
+                // Completion toggle
+                IconButton(
+                    onClick = onToggleCompletion,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = if (progress >= 1f)
+                                color.copy(alpha = 0.15f)
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (progress >= 1f)
+                            Icons.Filled.CheckCircle
+                        else
+                            Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        tint = if (progress >= 1f) color else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -624,351 +1069,598 @@ fun ImprovedViewModeSelector(
     }
 }
 
+
 @Composable
-fun ImprovedViewModeOption(
+private fun ProgressIndicator(
+    progress: Float,
+    size: Dp = 40.dp,
+    strokeWidth: Dp = 3.dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(size)
+    ) {
+        // Background circle
+        CircularProgressIndicator(
+            progress = { 1f },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            strokeWidth = strokeWidth,
+            modifier = Modifier.size(size)
+        )
+
+        // Foreground progress
+        CircularProgressIndicator(
+            progress = { progress },
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = strokeWidth,
+            modifier = Modifier.size(size)
+        )
+
+        // Percentage text
+        Text(
+            text = "${(progress * 100).toInt()}%",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = {
+            Text(
+                text = stringResource(R.string.search_habits),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Clear",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent
+        ),
+        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun FilterPanel(
+    filterState: HabitsFilterState,
+    onStatusFilterChanged: (HabitStatusFilter) -> Unit,
+    onSortOrderChanged: (SortOrder) -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp)
+    ) {
+        // Header with title and clear button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.filters),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            TextButton(
+                onClick = onClearFilters,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = stringResource(R.string.clear_all),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Status filters
+        Text(
+            text = stringResource(R.string.status),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Status filter chips in a Flow layout
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatusFilterChip(
+                status = HabitStatusFilter.ACTIVE,
+                selected = filterState.statusFilter == HabitStatusFilter.ACTIVE,
+                onSelected = onStatusFilterChanged
+            )
+
+            StatusFilterChip(
+                status = HabitStatusFilter.ARCHIVED,
+                selected = filterState.statusFilter == HabitStatusFilter.ARCHIVED,
+                onSelected = onStatusFilterChanged
+            )
+
+            StatusFilterChip(
+                status = HabitStatusFilter.ALL,
+                selected = filterState.statusFilter == HabitStatusFilter.ALL,
+                onSelected = onStatusFilterChanged
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Sort order
+        Text(
+            text = stringResource(R.string.sort_by),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Sort options in a scrollable row
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(end = 8.dp)
+        ) {
+            item {
+                SortOptionChip(
+                    order = SortOrder.NAME_ASC,
+                    selected = filterState.sortOrder == SortOrder.NAME_ASC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+
+            item {
+                SortOptionChip(
+                    order = SortOrder.NAME_DESC,
+                    selected = filterState.sortOrder == SortOrder.NAME_DESC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+
+            item {
+                SortOptionChip(
+                    order = SortOrder.STREAK_DESC,
+                    selected = filterState.sortOrder == SortOrder.STREAK_DESC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+
+            item {
+                SortOptionChip(
+                    order = SortOrder.PROGRESS_DESC,
+                    selected = filterState.sortOrder == SortOrder.PROGRESS_DESC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+
+            item {
+                SortOptionChip(
+                    order = SortOrder.CREATION_DATE_DESC,
+                    selected = filterState.sortOrder == SortOrder.CREATION_DATE_DESC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+
+            item {
+                SortOptionChip(
+                    order = SortOrder.CREATION_DATE_ASC,
+                    selected = filterState.sortOrder == SortOrder.CREATION_DATE_ASC,
+                    onSelected = onSortOrderChanged
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusFilterChip(
+    status: HabitStatusFilter,
+    selected: Boolean,
+    onSelected: (HabitStatusFilter) -> Unit
+) {
+    val (icon, label) = when (status) {
+        HabitStatusFilter.ACTIVE -> Pair(
+            Icons.Filled.CheckCircle,
+            stringResource(R.string.active)
+        )
+        HabitStatusFilter.ARCHIVED -> Pair(
+            Icons.Filled.Archive,
+            stringResource(R.string.archived)
+        )
+        HabitStatusFilter.ALL -> Pair(
+            Icons.Filled.List,
+            stringResource(R.string.all)
+        )
+    }
+
+    FilterChip(
+        selected = selected,
+        onClick = { onSelected(status) },
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    )
+}
+
+@Composable
+private fun SortOptionChip(
+    order: SortOrder,
+    selected: Boolean,
+    onSelected: (SortOrder) -> Unit
+) {
+    val (icon, label) = when (order) {
+        SortOrder.NAME_ASC -> Pair(
+            Icons.Filled.SortByAlpha,
+            stringResource(R.string.name_asc)
+        )
+        SortOrder.NAME_DESC -> Pair(
+            Icons.Filled.SortByAlpha,
+            stringResource(R.string.name_desc)
+        )
+        SortOrder.STREAK_DESC -> Pair(
+            Icons.Filled.Whatshot,
+            stringResource(R.string.streak_desc)
+        )
+        SortOrder.STREAK_ASC -> Pair(
+            Icons.Filled.Whatshot,
+            stringResource(R.string.streak_asc)
+        )
+        SortOrder.PROGRESS_DESC -> Pair(
+            Icons.Filled.TrendingUp,
+            stringResource(R.string.progress_desc)
+        )
+        SortOrder.PROGRESS_ASC -> Pair(
+            Icons.Filled.TrendingDown,
+            stringResource(R.string.progress_asc)
+        )
+        SortOrder.CREATION_DATE_DESC -> Pair(
+            Icons.Filled.DateRange,
+            stringResource(R.string.creation_desc)
+        )
+        SortOrder.CREATION_DATE_ASC -> Pair(
+            Icons.Filled.DateRange,
+            stringResource(R.string.creation_asc)
+        )
+    }
+
+    ElevatedFilterChip(
+        selected = selected,
+        onClick = { onSelected(order) },
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+        },
+        colors = FilterChipDefaults.elevatedFilterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    )
+}
+
+@Composable
+private fun ViewModePanel(
+    currentMode: HabitViewMode,
+    onModeSelected: (HabitViewMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.view_mode),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ViewModeOption(
+                mode = HabitViewMode.LIST,
+                icon = Icons.Filled.ViewList,
+                label = stringResource(R.string.view_list),
+                selected = currentMode == HabitViewMode.LIST,
+                onSelected = { onModeSelected(HabitViewMode.LIST) }
+            )
+
+            ViewModeOption(
+                mode = HabitViewMode.GRID,
+                icon = Icons.Filled.GridView,
+                label = stringResource(R.string.view_grid),
+                selected = currentMode == HabitViewMode.GRID,
+                onSelected = { onModeSelected(HabitViewMode.GRID) }
+            )
+
+            ViewModeOption(
+                mode = HabitViewMode.CATEGORIES,
+                icon = Icons.Filled.Category,
+                label = stringResource(R.string.view_categories),
+                selected = currentMode == HabitViewMode.CATEGORIES,
+                onSelected = { onModeSelected(HabitViewMode.CATEGORIES) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ViewModeOption(
     mode: HabitViewMode,
+    icon: ImageVector,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     onSelected: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .padding(horizontal = 4.dp)
+            .width(90.dp)
             .clickable(onClick = onSelected)
+            .padding(8.dp)
     ) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-            ),
-            modifier = Modifier.size(56.dp)
+            shape = RoundedCornerShape(16.dp),
+            color = if (selected)
+                MaterialTheme.colorScheme.primaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .size(64.dp)
+                .shadow(
+                    elevation = if (selected) 4.dp else 0.dp,
+                    shape = RoundedCornerShape(16.dp)
+                )
         ) {
             Box(
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
             ) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(28.dp)
+                    contentDescription = label,
+                    tint = if (selected)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(32.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            maxLines = 2,
-            fontSize = 11.sp,
-            modifier = Modifier.width(60.dp)
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-// Остальные функции без изменений...
 @Composable
-fun FilterStatusBar(
-    statusFilter: HabitStatusFilter,
-    onStatusFilterChanged: (HabitStatusFilter) -> Unit,
-    onSearchClicked: () -> Unit,
-    onSortClicked: () -> Unit,
-    onViewModeClicked: () -> Unit,
-    onCategoriesToggle: () -> Unit,
-    areCategoriesVisible: Boolean,
+private fun EnhancedDateSelector(
+    selectedDate: LocalDate,
+    weekStartDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onJumpToToday: () -> Unit,
+    habits: List<HabitWithProgress>,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+    val today = LocalDate.now()
+
+    // Create localization helpers
+    val monthLocalization = MonthLocalization(
+        january = stringResource(R.string.january),
+        february = stringResource(R.string.february),
+        march = stringResource(R.string.march),
+        april = stringResource(R.string.april),
+        may = stringResource(R.string.may),
+        june = stringResource(R.string.june),
+        july = stringResource(R.string.july),
+        august = stringResource(R.string.august),
+        september = stringResource(R.string.september),
+        october = stringResource(R.string.october),
+        november = stringResource(R.string.november),
+        december = stringResource(R.string.december)
+    )
+
+    val dayLocalization = DayOfWeekLocalization(
+        monday = stringResource(R.string.monday_short),
+        tuesday = stringResource(R.string.tuesday_short),
+        wednesday = stringResource(R.string.wednesday_short),
+        thursday = stringResource(R.string.thursday_short),
+        friday = stringResource(R.string.friday_short),
+        saturday = stringResource(R.string.saturday_short),
+        sunday = stringResource(R.string.sunday_short)
+    )
+
+    // Calculate date range for the week
+    val dateRange = remember(weekStartDate) {
+        (0..6).map { weekStartDate.plusDays(it.toLong()) }
+    }
+
+    // Format month year range for display
+    val monthYearText = remember(dateRange.first(), dateRange.last()) {
+        val startMonth = monthLocalization.getLocalizedMonth(dateRange.first().month)
+        val endMonth = monthLocalization.getLocalizedMonth(dateRange.last().month)
+        val startYear = dateRange.first().year
+        val endYear = dateRange.last().year
+
+        if (dateRange.first().month == dateRange.last().month && startYear == endYear) {
+            "$startMonth $startYear"
+        } else if (startYear == endYear) {
+            "$startMonth - $endMonth $startYear"
+        } else {
+            "$startMonth $startYear - $endMonth $endYear"
+        }
+    }
+
+    // Calculate if the current week contains today
+    val isCurrentWeek = today in dateRange
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+        ),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            // Верхняя строка с фильтрами и кнопками
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header with month/year and navigation controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Фильтры по статусу
-                FilterChips(
-                    selectedFilter = statusFilter,
-                    onFilterSelected = onStatusFilterChanged,
+                // Month and year header
+                Text(
+                    text = monthYearText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
 
-                // Кнопки действий
+                // Week navigation controls
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Кнопка поиска
-                    IconButton(onClick = onSearchClicked) {
-                        Icon(Icons.Default.Search, contentDescription = "Поиск")
+                    // Today button
+                    if (!isCurrentWeek) {
+                        IconButton(
+                            onClick = onJumpToToday,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Today,
+                                contentDescription = stringResource(R.string.today),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
-                    // Кнопка сортировки
-                    IconButton(onClick = onSortClicked) {
-                        Icon(Icons.Default.Sort, contentDescription = "Сортировка")
-                    }
-
-                    // Кнопка смены режима отображения
-                    IconButton(onClick = onViewModeClicked) {
-                        Icon(Icons.Default.GridView, contentDescription = "Режим отображения")
-                    }
-
-                    // Кнопка переключения видимости категорий
-                    IconButton(onClick = onCategoriesToggle) {
+                    // Previous week button
+                    IconButton(
+                        onClick = onPreviousWeek,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
-                            imageVector = if (areCategoriesVisible) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (areCategoriesVisible) "Скрыть категории" else "Показать категории"
+                            imageVector = Icons.Filled.ChevronLeft,
+                            contentDescription = stringResource(R.string.previous_week),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Next week button
+                    IconButton(
+                        onClick = onNextWeek,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = stringResource(R.string.next_week),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun FilterChips(
-    selectedFilter: HabitStatusFilter,
-    onFilterSelected: (HabitStatusFilter) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Список фильтров с более короткими подписями для адаптивности
-        val filters = listOf(
-            HabitStatusFilter.ACTIVE to stringResource(R.string.active),
-            HabitStatusFilter.ARCHIVED to stringResource(R.string.archived),
-            HabitStatusFilter.ALL to stringResource(R.string.all)
-        )
+            Spacer(modifier = Modifier.height(8.dp))
 
-        filters.forEach { (filter, label) ->
-            FilterChip(
-                selected = selectedFilter == filter,
-                onClick = { onFilterSelected(filter) },
-                label = {
-                    Text(
-                        text = label,
-                        // Для длинных слов используем меньший размер шрифта
-                        fontSize = if (label.length > 7) 12.sp else 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                leadingIcon = when(filter) {
-                    HabitStatusFilter.ACTIVE -> {
-                        { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    }
-                    HabitStatusFilter.ARCHIVED -> {
-                        { Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    }
-                    HabitStatusFilter.ALL -> {
-                        { Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    }
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedFilter == filter,
-                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    selectedBorderColor = Color.Transparent
-                ),
-                modifier = Modifier.height(32.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun ViewModeSelector(
-    currentMode: HabitViewMode,
-    onModeSelected: (HabitViewMode) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val modes = listOf(
-        HabitViewMode.LIST to stringResource(R.string.view_list),
-        HabitViewMode.GRID to stringResource(R.string.view_grid),
-        HabitViewMode.CATEGORIES to stringResource(R.string.view_categories)
-    )
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(8.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            modes.forEach { (mode, label) ->
-                val selected = mode == currentMode
-                ViewModeOption(
-                    mode = mode,
-                    label = label,
-                    selected = selected,
-                    onSelected = { onModeSelected(mode) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ViewModeOption(
-    mode: HabitViewMode,
-    label: String,
-    selected: Boolean,
-    onSelected: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val icon = when (mode) {
-        HabitViewMode.LIST -> Icons.Default.ViewList
-        HabitViewMode.GRID -> Icons.Default.GridView
-        HabitViewMode.CATEGORIES -> Icons.Default.Category
-    }
-
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        modifier = modifier
-            .padding(horizontal = 4.dp)
-            .clickable(onClick = onSelected)
-    ) {
-        Row(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun SortOrderSelector(
-    currentSortOrder: SortOrder,
-    onSortSelected: (SortOrder) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val sortGroups = listOf(
-        "По имени" to listOf(
-            SortOrder.NAME_ASC to stringResource(R.string.name_asc),
-            SortOrder.NAME_DESC to stringResource(R.string.name_desc)
-        ),
-        "По серии" to listOf(
-            SortOrder.STREAK_DESC to stringResource(R.string.streak_desc),
-            SortOrder.STREAK_ASC to stringResource(R.string.streak_asc)
-        ),
-        "По прогрессу" to listOf(
-            SortOrder.PROGRESS_DESC to stringResource(R.string.progress_desc),
-            SortOrder.PROGRESS_ASC to stringResource(R.string.progress_asc)
-        ),
-        "По дате создания" to listOf(
-            SortOrder.CREATION_DATE_DESC to stringResource(R.string.creation_desc),
-            SortOrder.CREATION_DATE_ASC to stringResource(R.string.creation_asc)
-        )
-    )
-
-    LazyRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp)
-    ) {
-        sortGroups.forEach { (groupName, sortOptions) ->
-            item {
-                SortOptionGroup(
-                    groupName = groupName,
-                    options = sortOptions,
-                    currentSortOrder = currentSortOrder,
-                    onSortSelected = onSortSelected
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SortOptionGroup(
-    groupName: String,
-    options: List<Pair<SortOrder, String>>,
-    currentSortOrder: SortOrder,
-    onSortSelected: (SortOrder) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Text(
-                text = groupName,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            options.forEach { (sortOrder, label) ->
-                val isSelected = sortOrder == currentSortOrder
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onSortSelected(sortOrder) }
-                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = isSelected,
-                        onClick = { onSortSelected(sortOrder) },
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+            // Date selector row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                dateRange.forEach { date ->
+                    DateItem(
+                        date = date,
+                        selected = date.isEqual(selectedDate),
+                        isToday = date.isEqual(today),
+                        hasCompletedHabits = hasCompletedHabitsForDate(date, habits),
+                        onDateSelected = { onDateSelected(date) },
+                        dayLocalization = dayLocalization
                     )
                 }
             }
@@ -977,154 +1669,298 @@ fun SortOptionGroup(
 }
 
 @Composable
-fun CategoriesFilter(
+private fun DateItem(
+    date: LocalDate,
+    selected: Boolean,
+    isToday: Boolean,
+    hasCompletedHabits: Boolean,
+    onDateSelected: () -> Unit,
+    dayLocalization: DayOfWeekLocalization
+) {
+    val dayOfWeek = remember(date) {
+        dayLocalization.getLocalizedDayOfWeek(date.dayOfWeek)
+    }
+    val dayOfMonth = remember(date) { date.dayOfMonth.toString() }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .widthIn(min = 40.dp)
+            .clickable(onClick = onDateSelected)
+            .padding(vertical = 4.dp, horizontal = 4.dp)
+    ) {
+        // Day of week (Mon, Tue, etc)
+        Text(
+            text = dayOfWeek,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Date circle
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .background(
+                    color = when {
+                        selected -> MaterialTheme.colorScheme.primary
+                        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        else -> Color.Transparent
+                    },
+                    shape = CircleShape
+                )
+        ) {
+            Text(
+                text = dayOfMonth,
+                style = MaterialTheme.typography.titleMedium,
+                color = when {
+                    selected -> MaterialTheme.colorScheme.onPrimary
+                    isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                fontWeight = if (isToday || selected) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Indicator dot for completed habits
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(
+                    color = if (hasCompletedHabits)
+                        MaterialTheme.colorScheme.tertiary
+                    else
+                        Color.Transparent,
+                    shape = CircleShape
+                )
+        )
+    }
+}
+
+
+@Composable
+private fun CategoryTabs(
     categories: List<Category>,
     selectedCategoryId: String?,
     onCategorySelected: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyRow(
+    val scrollState = rememberScrollState()
+
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp)
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // "Все категории" чип
-        item {
-            FilterChip(
-                selected = selectedCategoryId == null,
-                onClick = { onCategorySelected(null) },
-                label = { Text(stringResource(R.string.all)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.padding(end = 8.dp)
-            )
-        }
+        // "All" category chip
+        CategoryChip(
+            name = stringResource(R.string.all_categories),
+            color = MaterialTheme.colorScheme.primary,
+            selected = selectedCategoryId == null,
+            onSelected = { onCategorySelected(null) }
+        )
 
-        // Категории
-        items(categories) { category ->
-            val color = try {
-                category.color?.let { Color(android.graphics.Color.parseColor(it)) }
-            } catch (e: Exception) {
-                null
-            }
+        // Custom category chips
+        categories.forEach { category ->
+            val categoryColor = parseColor(category.color, MaterialTheme.colorScheme.primary)
 
-            FilterChip(
+            CategoryChip(
+                name = category.name,
+                color = categoryColor,
                 selected = selectedCategoryId == category.id,
-                onClick = { onCategorySelected(category.id) },
-                label = { Text(category.name) },
-                leadingIcon = {
-                    if (color != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                    }
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = color?.copy(alpha = 0.2f)
-                        ?: MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.padding(end = 8.dp)
+                onSelected = { onCategorySelected(category.id) }
             )
         }
+    }
+}
+@Composable
+private fun formatDayOfWeek(date: LocalDate): String {
+    return when (date.dayOfWeek.value) {
+        1 -> stringResource(R.string.monday_short)
+        2 -> stringResource(R.string.tuesday_short)
+        3 -> stringResource(R.string.wednesday_short)
+        4 -> stringResource(R.string.thursday_short)
+        5 -> stringResource(R.string.friday_short)
+        6 -> stringResource(R.string.saturday_short)
+        7 -> stringResource(R.string.sunday_short)
+        else -> ""
     }
 }
 
 @Composable
-fun EmptyHabitsView(
-    filterState: HabitsFilterState,
-    onCreateHabit: () -> Unit,
-    onClearFilters: () -> Unit
+private fun getLocalizedMonth(month: Month): String {
+    return when (month) {
+        Month.JANUARY -> stringResource(R.string.january)
+        Month.FEBRUARY -> stringResource(R.string.february)
+        Month.MARCH -> stringResource(R.string.march)
+        Month.APRIL -> stringResource(R.string.april)
+        Month.MAY -> stringResource(R.string.may)
+        Month.JUNE -> stringResource(R.string.june)
+        Month.JULY -> stringResource(R.string.july)
+        Month.AUGUST -> stringResource(R.string.august)
+        Month.SEPTEMBER -> stringResource(R.string.september)
+        Month.OCTOBER -> stringResource(R.string.october)
+        Month.NOVEMBER -> stringResource(R.string.november)
+        Month.DECEMBER -> stringResource(R.string.december)
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    name: String,
+    color: Color,
+    selected: Boolean,
+    onSelected: () -> Unit
 ) {
-    // Отображение когда нет привычек или они были отфильтрованы
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) color.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) color else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        ),
+        modifier = Modifier.clickable(onClick = onSelected)
     ) {
-        // Анимированная иконка
-        val infiniteTransition = rememberInfiniteTransition(label = "empty_animation")
-        val iconSize by infiniteTransition.animateFloat(
-            initialValue = 0.9f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1500, easing = EaseInOutQuart),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "icon_size"
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(color, CircleShape)
+            )
 
-        Icon(
-            imageVector = Icons.Outlined.NoteAdd,
-            contentDescription = null,
-            modifier = Modifier
-                .size(80.dp)
-                .graphicsLayer {
-                    scaleX = iconSize
-                    scaleY = iconSize
-                },
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
+            Spacer(modifier = Modifier.width(8.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = if (filterState.searchQuery.isNotEmpty() || filterState.selectedCategoryId != null)
-                stringResource(R.string.no_habits_found)
-            else if (filterState.statusFilter == HabitStatusFilter.ARCHIVED)
-                stringResource(R.string.no_archived_habits)
-            else
-                stringResource(R.string.no_habits_yet),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = if (filterState.searchQuery.isNotEmpty() || filterState.selectedCategoryId != null)
-                stringResource(R.string.try_different_search)
-            else if (filterState.statusFilter == HabitStatusFilter.ARCHIVED)
-                stringResource(R.string.archive_habits_tip)
-            else
-                stringResource(R.string.create_habit_tip),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (filterState.searchQuery.isNotEmpty() || filterState.selectedCategoryId != null) {
-            Button(
-                onClick = onClearFilters,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Text(stringResource(R.string.clear_filters))
-            }
-        } else if (filterState.statusFilter != HabitStatusFilter.ARCHIVED) {
-            Button(
-                onClick = onCreateHabit,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(stringResource(R.string.create_first_habit))
-            }
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) color else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            )
         }
     }
 }
 
-// Easing для анимаций
-private val EaseInOutQuart = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
+
+
+
+@Composable
+private fun EmptyStateView(
+    filterState: HabitsFilterState,
+    onCreateHabit: () -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hasActiveFilters = countActiveFilters(filterState) > 0 || filterState.searchQuery.isNotEmpty()
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp)
+    ) {
+        // Illustration
+        Icon(
+            imageVector = if (hasActiveFilters)
+                Icons.Outlined.FilterAlt
+            else
+                Icons.Outlined.SentimentDissatisfied,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+            modifier = Modifier.size(80.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Title
+        Text(
+            text = if (hasActiveFilters)
+                stringResource(R.string.no_habits_match_filters)
+            else
+                stringResource(R.string.no_habits_yet),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Description
+        Text(
+            text = if (hasActiveFilters)
+                stringResource(R.string.try_changing_filters)
+            else
+                stringResource(R.string.create_your_first_habit),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Action button
+        Button(
+            onClick = if (hasActiveFilters) onClearFilters else onCreateHabit,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(
+                imageVector = if (hasActiveFilters)
+                    Icons.Filled.FilterListOff
+                else
+                    Icons.Filled.Add,
+                contentDescription = null
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = if (hasActiveFilters)
+                    stringResource(R.string.clear_filters)
+                else
+                    stringResource(R.string.create_habit)
+            )
+        }
+    }
+}
+
+
+// Helper methods
+private fun countActiveFilters(filterState: HabitsFilterState): Int {
+    var count = 0
+    if (filterState.statusFilter != HabitStatusFilter.ACTIVE) count++
+    if (filterState.sortOrder != SortOrder.NAME_ASC) count++
+    if (filterState.selectedCategoryId != null) count++
+    return count
+}
+
+private fun formatMonthYear(date: LocalDate): String {
+    val month = date.month.toString().lowercase().capitalize()
+    return "$month ${date.year}"
+}
+
+private fun hasCompletedHabitsForDate(date: LocalDate, habits: List<HabitWithProgress>): Boolean {
+    return habits.any { it.completedDates.contains(date) }
+}
+
+// Enum classes for UI state management
+private enum class ExpandableSection {
+    FILTERS, VIEW_MODES
+}
+
+// Extension function for capitalizing strings
+private fun String.capitalize(): String {
+    return this.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase() else it.toString()
+    }
+}

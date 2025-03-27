@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -60,9 +61,8 @@ fun EditHabitScreen(
     navController: NavController,
     viewModel: EditHabitViewModel = hiltViewModel()
 ) {
-
-    val isCreationMode = navController.previousBackStackEntry?.destination?.route?.contains("habitId=null") == true
-            || navController.previousBackStackEntry?.destination?.route?.contains("habitId=") != true
+    // We can get isCreationMode directly from the viewModel
+    val isCreationMode = viewModel.isCreationMode
 
     val uiState by viewModel.uiState.collectAsState()
     val validationState by viewModel.validationState.collectAsState()
@@ -140,12 +140,12 @@ fun EditHabitScreen(
                 actions = {
                     IconButton(
                         onClick = { showDeleteConfirmation = true },
-                        enabled = navController.previousBackStackEntry?.destination?.route?.contains("habitId=null") != true
+                        enabled = !isCreationMode
                     ) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Удалить",
-                            tint = if (navController.previousBackStackEntry?.destination?.route?.contains("habitId=null") != true)
+                            tint = if (!isCreationMode)
                                 MaterialTheme.colorScheme.error
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
@@ -191,12 +191,24 @@ fun EditHabitScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+
             // Блок типа привычки
             HabitTypeSection(
                 selectedType = uiState.habitType,
                 onTypeSelected = { viewModel.onEvent(EditHabitEvent.HabitTypeChanged(it)) }
             )
-
+            Spacer(modifier = Modifier.height(24.dp))
+            // Блок прогресса (зависит от типа привычки)
+            HabitProgressSection(
+                habitType = uiState.habitType,
+                targetValue = uiState.targetValue,
+                onTargetValueChange = { viewModel.onEvent(EditHabitEvent.TargetValueChanged(it)) },
+                unitOfMeasurement = uiState.unitOfMeasurement,
+                onUnitOfMeasurementChange = { viewModel.onEvent(EditHabitEvent.UnitOfMeasurementChanged(it)) },
+                targetStreak = uiState.targetStreak,
+                onTargetStreakChange = { viewModel.onEvent(EditHabitEvent.TargetStreakChanged(it)) },
+                habitColor = habitColor
+            )
             Spacer(modifier = Modifier.height(24.dp))
 
             // Блок категории
@@ -225,17 +237,7 @@ fun EditHabitScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Блок прогресса (зависит от типа привычки)
-            HabitProgressSection(
-                habitType = uiState.habitType,
-                targetValue = uiState.targetValue,
-                onTargetValueChange = { viewModel.onEvent(EditHabitEvent.TargetValueChanged(it)) },
-                unitOfMeasurement = uiState.unitOfMeasurement,
-                onUnitOfMeasurementChange = { viewModel.onEvent(EditHabitEvent.UnitOfMeasurementChanged(it)) },
-                targetStreak = uiState.targetStreak,
-                onTargetStreakChange = { viewModel.onEvent(EditHabitEvent.TargetStreakChanged(it)) },
-                habitColor = habitColor
-            )
+
 
             Spacer(modifier = Modifier.height(24.dp))
 

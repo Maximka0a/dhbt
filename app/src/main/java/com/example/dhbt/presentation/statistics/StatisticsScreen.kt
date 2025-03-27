@@ -33,8 +33,9 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.PieEntry
 import kotlinx.coroutines.launch
-import org.threeten.bp.LocalDate
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,7 +228,7 @@ fun StatisticsScreen(
 fun PeriodSelectorSection(
     selectedPeriod: StatisticPeriod,
     onPeriodSelected: (StatisticPeriod) -> Unit,
-    availableMonths: List<org.threeten.bp.YearMonth>,
+    availableMonths: List<YearMonth>,
     availableYears: List<Int>
 ) {
     Surface(

@@ -1,6 +1,9 @@
 package com.example.dhbt.presentation.util
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 
 /**
  * Преобразует строку с HEX кодом цвета в объект Color
@@ -32,7 +35,7 @@ fun String?.toColor(defaultColor: Color = Color.Gray): Color {
         defaultColor
     }
 }
-
+// Вспомогательная функция для парсинга цвета
 fun parseColor(colorString: String?, defaultColor: Color): Color {
     return try {
         colorString?.let { Color(android.graphics.Color.parseColor(it)) } ?: defaultColor

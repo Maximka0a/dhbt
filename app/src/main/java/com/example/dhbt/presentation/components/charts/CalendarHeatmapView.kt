@@ -13,9 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import org.threeten.bp.DayOfWeek
-import org.threeten.bp.LocalDate
-import org.threeten.bp.temporal.WeekFields
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 /**
