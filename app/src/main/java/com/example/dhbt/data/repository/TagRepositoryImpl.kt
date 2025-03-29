@@ -19,8 +19,10 @@ class TagRepositoryImpl @Inject constructor(
 ) : TagRepository {
 
     override fun getAllTags(): Flow<List<Tag>> {
-        return tagDao.getAllTags().map { entities ->
-            entities.map { tagMapper.mapFromEntity(it) }
+        return tagDao.getAllTags().map { tagEntities ->
+            tagEntities.map { tagEntity ->
+                tagMapper.mapFromEntity(tagEntity)
+            }
         }
     }
 

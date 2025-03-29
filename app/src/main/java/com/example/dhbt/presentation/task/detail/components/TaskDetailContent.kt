@@ -1,5 +1,6 @@
 package com.example.dhbt.presentation.task.detail.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,8 @@ import com.example.dhbt.presentation.task.detail.TaskDetailState
 fun TaskDetailContent(
     state: TaskDetailState,
     onSubtaskToggle: (Subtask) -> Unit,
+    onNavigateToPomodoro: (String) -> Unit,
+    onDeleteTask: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isCompleted = state.task?.status == TaskStatus.COMPLETED
@@ -59,7 +62,9 @@ fun TaskDetailContent(
                 onToggle = onSubtaskToggle
             )
 
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
         }
 
         // Теги
@@ -76,32 +81,40 @@ fun TaskDetailContent(
             duration = state.task?.duration,
             estimatedPomodoros = state.task?.estimatedPomodoroSessions,
             totalFocusTime = state.totalFocusTime,
-            recurrence = state.recurrence
-        )
-        if (state.task != null && !state.isLoading) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shadowElevation = 3.dp
-            ) {
-                Button(
-                    onClick = { state.showDeleteConfirmDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text(stringResource(R.string.delete_task))
+            recurrence = state.recurrence,
+            onStartPomodoro = {
+                state.task?.id?.let { taskId ->
+                    onNavigateToPomodoro(taskId)
                 }
             }
+        )
+        if (state.task != null && !state.isLoading) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+// Кнопка удаления задачи с улучшенным дизайном
+            OutlinedButton(
+                onClick = onDeleteTask, // Использовать метод ViewModel
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = stringResource(R.string.delete_task),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
+            Spacer(modifier = Modifier.height(80.dp))
         }
         // Увеличенный отступ для кнопки удаления внизу
         Spacer(modifier = Modifier.height(100.dp))

@@ -1,7 +1,5 @@
 package com.example.dhbt.presentation.task.list
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dhbt.domain.model.Category
@@ -15,9 +13,17 @@ import com.example.dhbt.domain.repository.TagRepository
 import com.example.dhbt.domain.repository.TaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -30,23 +36,19 @@ class TasksViewModel @Inject constructor(
     private val tagRepository: TagRepository
 ) : ViewModel() {
 
-    // Состояние фильтрации
+    // State declarations remain the same
     private val _filterState = MutableStateFlow(TaskFilterState())
     val filterState: StateFlow<TaskFilterState> = _filterState.asStateFlow()
 
-    // Состояние UI экрана
     private val _state = MutableStateFlow(TasksState())
     val state: StateFlow<TasksState> = _state.asStateFlow()
 
-    // Категории для фильтрации
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
 
-    // Теги для фильтрации
     private val _tags = MutableStateFlow<List<Tag>>(emptyList())
     val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
 
-    // Даты с задачами для отображения в календаре
     private val _datesWithTasks = MutableStateFlow<Set<LocalDate>>(emptySet())
     val datesWithTasks: StateFlow<Set<LocalDate>> = _datesWithTasks.asStateFlow()
 
@@ -56,7 +58,7 @@ class TasksViewModel @Inject constructor(
         observeTasks()
     }
 
-    // Загрузка категорий
+    // Loading methods remain the same
     private fun loadCategories() {
         viewModelScope.launch {
             categoryRepository.getCategoriesByType(CategoryType.TASK)
@@ -66,7 +68,6 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    // Загрузка тегов
     private fun loadTags() {
         viewModelScope.launch {
             tagRepository.getAllTags()
@@ -76,7 +77,6 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    // Наблюдение за задачами с применением фильтров
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeTasks() {
         filterState
@@ -104,57 +104,64 @@ class TasksViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    // Применение фильтров к потоку задач
+    // Modified to apply multiple filters together
+// Modified tag filtering logic
     private fun applyFilters(filters: TaskFilterState): Flow<List<Task>> {
-        return when {
-            filters.selectedDate != null -> {
-                // Фильтр по дате
+        return taskRepository.getAllTasks().map { allTasks ->
+            var filteredTasks = allTasks
+
+            // Apply date filter if selected
+            if (filters.selectedDate != null) {
                 val startOfDay = filters.selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 val endOfDay = filters.selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
-                taskRepository.getAllTasks().map { tasks ->
-                    tasks.filter { task ->
-                        val dueDate = task.dueDate ?: 0L
-                        dueDate in startOfDay..endOfDay
-                    }
+                filteredTasks = filteredTasks.filter { task ->
+                    val dueDate = task.dueDate ?: 0L
+                    dueDate in startOfDay..endOfDay
                 }
             }
-            filters.selectedCategoryId != null -> {
-                // Фильтр по категории
-                taskRepository.getTasksByCategory(filters.selectedCategoryId)
-            }
-            filters.selectedPriority != null -> {
-                // Фильтр по приоритету
-                taskRepository.getTasksByPriority(filters.selectedPriority)
-            }
-            filters.selectedStatus != null -> {
-                // Фильтр по статусу
-                taskRepository.getTasksByStatus(filters.selectedStatus)
-            }
-            filters.selectedTagIds.isNotEmpty() -> {
-                // Фильтр по тегам
-                taskRepository.getTasksWithTags(filters.selectedTagIds)
-            }
-            filters.searchQuery.isNotEmpty() -> {
-                // Поиск по запросу
-                taskRepository.getAllTasks().map { tasks ->
-                    tasks.filter { task ->
-                        task.title.contains(filters.searchQuery, ignoreCase = true) ||
-                                (task.description?.contains(filters.searchQuery, ignoreCase = true) ?: false)
-                    }
+
+            // Apply category filter if selected
+            if (filters.selectedCategoryId != null) {
+                filteredTasks = filteredTasks.filter { task ->
+                    task.categoryId == filters.selectedCategoryId
                 }
             }
-            filters.showEisenhowerMatrix -> {
-                // Режим матрицы Эйзенхауэра - возвращаем все задачи, сортировку сделаем отдельно
-                taskRepository.getAllTasks()
+
+            // Apply priority filter if selected
+            if (filters.selectedPriority != null) {
+                filteredTasks = filteredTasks.filter { task ->
+                    task.priority == filters.selectedPriority
+                }
             }
-            else -> {
-                // Без фильтров - все задачи
-                taskRepository.getAllTasks()
+
+            // Apply status filter if selected
+            if (filters.selectedStatus != null) {
+                filteredTasks = filteredTasks.filter { task ->
+                    task.status == filters.selectedStatus
+                }
             }
+
+            // Apply tag filters if selected - FIXED
+            if (filters.selectedTagIds.isNotEmpty()) {
+                filteredTasks = filteredTasks.filter { task ->
+                    // Extract tag IDs from the tag objects and check if any match the selected IDs
+                    task.tags.any { tag -> filters.selectedTagIds.contains(tag.id) }
+                }
+            }
+
+            // Apply search query if not empty
+            if (filters.searchQuery.isNotEmpty()) {
+                filteredTasks = filteredTasks.filter { task ->
+                    task.title.contains(filters.searchQuery, ignoreCase = true) ||
+                            (task.description?.contains(filters.searchQuery, ignoreCase = true) ?: false)
+                }
+            }
+
+            filteredTasks
         }
     }
 
-    // Сортировка задач
+    // Sorting remains the same
     private fun applySorting(tasks: List<Task>, sortOption: SortOption): List<Task> {
         return when (sortOption) {
             SortOption.DATE_ASC -> tasks.sortedBy { it.dueDate }
@@ -166,8 +173,6 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    // Обновление состояния календаря - находим даты с задачами
-// In your TasksViewModel.kt
     private fun updateDatesWithTasks(tasks: List<Task>) {
         val dates = tasks
             .mapNotNull { task -> task.dueDate }
@@ -179,49 +184,22 @@ class TasksViewModel @Inject constructor(
         _datesWithTasks.value = dates
     }
 
-    // Обработчики событий UI
+    // Modified filter methods to not reset other filters
 
     fun onDateSelected(date: LocalDate?) {
         _filterState.update { it.copy(selectedDate = date) }
     }
 
     fun onCategorySelected(categoryId: String?) {
-        _filterState.update {
-            it.copy(
-                selectedCategoryId = categoryId,
-                // Сбрасываем другие фильтры при выборе категории
-                selectedStatus = null,
-                selectedPriority = null,
-                selectedTagIds = emptyList(),
-                selectedDate = null
-            )
-        }
+        _filterState.update { it.copy(selectedCategoryId = categoryId) }
     }
 
     fun onStatusSelected(status: TaskStatus?) {
-        _filterState.update {
-            it.copy(
-                selectedStatus = status,
-                // Сбрасываем другие фильтры при выборе статуса
-                selectedCategoryId = null,
-                selectedPriority = null,
-                selectedTagIds = emptyList(),
-                selectedDate = null
-            )
-        }
+        _filterState.update { it.copy(selectedStatus = status) }
     }
 
     fun onPrioritySelected(priority: TaskPriority?) {
-        _filterState.update {
-            it.copy(
-                selectedPriority = priority,
-                // Сбрасываем другие фильтры при выборе приоритета
-                selectedCategoryId = null,
-                selectedStatus = null,
-                selectedTagIds = emptyList(),
-                selectedDate = null
-            )
-        }
+        _filterState.update { it.copy(selectedPriority = priority) }
     }
 
     fun onTagSelected(tagId: String) {
@@ -231,21 +209,13 @@ class TasksViewModel @Inject constructor(
             } else {
                 it.selectedTagIds + tagId
             }
-
-            it.copy(
-                selectedTagIds = tagIds,
-                // Сбрасываем другие фильтры при выборе тегов
-                selectedCategoryId = null,
-                selectedStatus = null,
-                selectedPriority = null,
-                selectedDate = null
-            )
+            it.copy(selectedTagIds = tagIds)
         }
     }
 
+    // Other methods remain the same
     fun onSortOptionSelected(sortOption: SortOption) {
         _filterState.update { it.copy(sortOption = sortOption) }
-        // Пересортируем задачи с новой опцией сортировки
         _state.update { currentState ->
             currentState.copy(
                 tasks = applySorting(currentState.tasks, sortOption)
@@ -265,18 +235,73 @@ class TasksViewModel @Inject constructor(
         _filterState.value = TaskFilterState()
     }
 
-    // Действия с задачами
-
+    // Task actions remain the same
     fun onTaskStatusChanged(taskId: String, isCompleted: Boolean) {
         viewModelScope.launch {
             val status = if (isCompleted) TaskStatus.COMPLETED else TaskStatus.ACTIVE
             taskRepository.updateTaskStatus(taskId, status)
         }
     }
+    // Add this new method for direct status toggling
+    fun toggleTaskStatus(taskId: String) {
+        viewModelScope.launch {
+            try {
+                // Get the current task
+                val task = taskRepository.getTaskById(taskId)
+                if (task != null) {
+                    // Determine current status and toggle to the opposite
+                    val newStatus = if (task.status == TaskStatus.COMPLETED)
+                        TaskStatus.ACTIVE
+                    else
+                        TaskStatus.COMPLETED
 
+                    taskRepository.updateTaskStatus(taskId, newStatus)
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(error = "Error updating task status: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // Добавьте это поле в TasksViewModel
+    private var lastDeletedTask: Task? = null
+
+    // Метод для восстановления удаленной задачи
+    fun restoreDeletedTask() {
+        viewModelScope.launch {
+            lastDeletedTask?.let { task ->
+                try {
+                    // Используем существующий метод addTask
+                    taskRepository.addTask(task)
+                    // Очищаем сохраненную задачу после восстановления
+                    lastDeletedTask = null
+                } catch (e: Exception) {
+                    _state.update {
+                        it.copy(error = "Ошибка при восстановлении задачи: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    // Модифицированный метод onDeleteTask
     fun onDeleteTask(taskId: String) {
         viewModelScope.launch {
-            taskRepository.deleteTask(taskId)
+            try {
+                // Сохраняем задачу перед удалением
+                val task = taskRepository.getTaskById(taskId)
+                if (task != null) {
+                    lastDeletedTask = task
+                    // Теперь удаляем задачу
+                    taskRepository.deleteTask(taskId)
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(error = "Ошибка при удалении задачи: ${e.message}")
+                }
+            }
         }
     }
 
@@ -286,13 +311,11 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    // Форматирование для UI
     fun formatDate(date: LocalDate): String {
         val formatter = DateTimeFormatter.ofPattern("d MMMM")
         return date.format(formatter)
     }
 }
-
 // Состояние экрана задач
 data class TasksState(
     val isLoading: Boolean = true,

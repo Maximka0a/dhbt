@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -24,7 +25,8 @@ fun StatisticsCard(
     completedTasks: Int,
     totalTasks: Int,
     completedHabits: Int,
-    totalHabits: Int
+    totalHabits: Int,
+    onCardClick: () -> Unit = {}
 ) {
     val isFirstRender = remember { mutableStateOf(true) }
 
@@ -34,32 +36,17 @@ fun StatisticsCard(
     }
 
     Card(
+        onClick = onCardClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .graphicsLayer {
-                // Анимировать масштаб и прозрачность при первом рендере
-                if (isFirstRender.value) {
-                    alpha = 0.3f
-                    scaleX = 0.9f
-                    scaleY = 0.9f
-                } else {
-                    alpha = 1f
-                    scaleX = 1f
-                    scaleY = 1f
-                }
-            }
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            ),
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            contentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp // Добавляем тень как в карточке привычки
+        )
     ) {
         Column(
             modifier = Modifier.padding(20.dp)

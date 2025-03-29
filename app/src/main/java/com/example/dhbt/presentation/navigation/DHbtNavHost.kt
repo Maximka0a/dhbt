@@ -69,8 +69,6 @@ fun DHbtNavHost(
                 onNavigateToPomodoro = { taskId ->
                     navController.navigate(Pomodoro(taskId = taskId))
                 }
-                // TaskViewModel будет автоматически внедрен через hiltViewModel()
-                // и получит taskId из savedStateHandle через навигационный аргумент
             )
         }
 
@@ -112,18 +110,20 @@ fun DHbtNavHost(
         }
 
         // Основные экраны навигации
-        composable<Dashboard> {
-            DashboardScreen(
-                onTaskClick = { taskId -> navController.navigate(TaskDetail(taskId)) },
-                onHabitClick = { habitId -> navController.navigate(HabitDetail(habitId)) },
-                onAddTask = { navController.navigate(TaskEdit()) },
-                onAddHabit = { navController.navigate(HabitEdit()) },
-                onViewAllTasks = { navController.navigate(Tasks) },
-                onViewAllHabits = { navController.navigate(Habits) },
-                onSettings = { navController.navigate(Settings) },
-                onPremiumClicked = { navController.navigate(PremiumSubscription) },
-            )
-        }
+            composable<Dashboard> {
+                DashboardScreen(
+                    onTaskClick = { taskId -> navController.navigate(TaskDetail(taskId)) },
+                    onHabitClick = { habitId -> navController.navigate(HabitDetail(habitId)) },
+                    onAddTask = { navController.navigate(TaskEdit()) },
+                    onAddHabit = { navController.navigate(HabitEdit()) },
+                    onViewAllTasks = { navController.navigate(Tasks) },
+                    onViewAllHabits = { navController.navigate(Habits) },
+                    onSettings = { navController.navigate(Settings) },
+                    onPremiumClicked = { navController.navigate(PremiumSubscription) },
+                    onStatisticsClick = { navController.navigate(Statistics) }
+                )
+            }
+
 
         composable<Tasks> {
             TasksScreen(

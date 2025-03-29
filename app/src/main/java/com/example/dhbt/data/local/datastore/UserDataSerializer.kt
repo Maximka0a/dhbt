@@ -8,7 +8,7 @@ import java.io.InputStream
 import java.io.OutputStream
 
 object UserDataSerializer : Serializer<UserData> {
-    override val defaultValue: UserData = UserData()
+    override val defaultValue: UserData = UserData(name = "Пользователь") // Явно указываем значение
 
     override suspend fun readFrom(input: InputStream): UserData {
         return try {

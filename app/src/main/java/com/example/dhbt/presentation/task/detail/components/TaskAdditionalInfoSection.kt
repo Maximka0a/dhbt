@@ -19,7 +19,9 @@ fun TaskAdditionalInfoSection(
     estimatedPomodoros: Int?,
     totalFocusTime: Int?,
     recurrence: TaskRecurrence?,
-    modifier: Modifier = Modifier
+    onStartPomodoro: () -> Unit,
+    modifier: Modifier = Modifier,
+
 ) {
     Column(
         modifier = modifier
@@ -67,7 +69,7 @@ fun TaskAdditionalInfoSection(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { /* Действие происходит через FAB */ },
+                onClick = onStartPomodoro ,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,

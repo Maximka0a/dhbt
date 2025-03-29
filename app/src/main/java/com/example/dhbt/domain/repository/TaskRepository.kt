@@ -18,8 +18,6 @@ interface TaskRepository {
     fun getTasksByEisenhowerQuadrant(quadrant: Int): Flow<List<Task>>
     fun getTasksWithTags(tagIds: List<String>): Flow<List<Task>>
 
-
-
     suspend fun getTaskById(taskId: String): Task?
     suspend fun addTask(task: Task): String
     suspend fun updateTask(task: Task)
@@ -43,4 +41,10 @@ interface TaskRepository {
     suspend fun addTagToTask(taskId: String, tagId: String)
     suspend fun removeTagFromTask(taskId: String, tagId: String)
     suspend fun setTagsForTask(taskId: String, tagIds: List<String>)
+
+    // Добавляем методы для работы с повторениями
+    suspend fun saveTaskRecurrence(recurrence: TaskRecurrence)
+    suspend fun deleteTaskRecurrence(taskId: String)
+    suspend fun deleteTagsForTask(taskId: String)
+    suspend fun deleteSubtasksForTask(taskId: String)
 }

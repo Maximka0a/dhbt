@@ -514,11 +514,14 @@
 
     <string name="overdue">Просрочено</string>
 
-
+    <string name="repeat">Повторять</string>
+    <string name="warning">Внимание: повторяющиеся задачи могут быть удалены только все вместе</string>
     <!-- Матрица Эйзенхауэра -->
     <string name="urgent_important">Срочно и важно</string>
     <string name="not_urgent_important">Несрочно, но важно</string>
     <string name="urgent_not_important">Срочно, но неважно</string>
     <string name="not_urgent_not_important">Несрочно и неважно</string>
     <string name="no_search_results">Нет результатов для \"%1$s\"</string>
+    <string name="no_date">Без даты</string>
+    <string name="empty_dashboard_message">Добавьте  задачи  и привычки, чтобы  начать отслеживать свой прогресс</string>
 </resources>

@@ -6,7 +6,7 @@ import java.util.UUID
 @Serializable
 data class UserData(
     val userId: String = UUID.randomUUID().toString(),
-    val name: String = "",
+    val name: String = "Пользователь", // Устанавливаем дефолтное имя
     val email: String? = null,
     val avatarUrl: String? = null,
     val wakeUpTime: String? = null, // "HH:MM"

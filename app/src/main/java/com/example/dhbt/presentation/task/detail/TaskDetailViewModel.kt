@@ -12,7 +12,6 @@ import com.example.dhbt.domain.repository.PomodoroRepository
 import com.example.dhbt.domain.repository.TagRepository
 import com.example.dhbt.domain.repository.TaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.IOException
 import javax.inject.Inject
@@ -42,6 +41,13 @@ class TaskDetailViewModel @Inject constructor(
         }
     }
 
+    fun reloadTaskDetails() {
+        loadTaskDetails() // Вызываем существующий приватный метод загрузки данных
+    }
+
+    /**
+     * Метод для загрузки деталей задачи
+     */
     private fun loadTaskDetails() {
         viewModelScope.launch {
             try {
@@ -68,22 +74,35 @@ class TaskDetailViewModel @Inject constructor(
                 // Загружаем время в Pomodoro
                 val totalFocusTime = pomodoroRepository.getTotalFocusTimeForTask(taskId)
 
-                // Загружаем подзадачи
-                taskRepository.getSubtasksForTask(taskId).collectLatest { subtasks ->
-                    // Загружаем теги
-                    tagRepository.getTagsForTask(taskId).collectLatest { tags ->
+                // Устанавливаем основную информацию о задаче
+                _state.value = _state.value.copy(
+                    task = task,
+                    category = category,
+                    recurrence = recurrence,
+                    totalFocusTime = totalFocusTime
+                )
+
+                // Загружаем подзадачи и теги независимо
+                viewModelScope.launch {
+                    taskRepository.getSubtasksForTask(taskId).collect { subtasks ->
                         _state.value = _state.value.copy(
-                            isLoading = false,
-                            task = task,
                             subtasks = subtasks,
-                            tags = tags,
-                            category = category,
-                            recurrence = recurrence,
-                            totalFocusTime = totalFocusTime
+                            isLoading = false
                         )
                     }
                 }
-            } catch (e: IOException) {
+
+                viewModelScope.launch {
+                    tagRepository.getTagsForTask(taskId).collect { tags ->
+                        android.util.Log.d("TaskDetailViewModel", "Loaded task tags: ${tags.size}")
+                        _state.value = _state.value.copy(
+                            tags = tags,
+                            isLoading = false
+                        )
+                    }
+                }
+
+            } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isLoading = false,
                     error = "Ошибка загрузки задачи: ${e.message}"
@@ -123,19 +142,27 @@ class TaskDetailViewModel @Inject constructor(
                 taskRepository.deleteTask(taskId)
                 _state.value = _state.value.copy(
                     task = null, // Указываем, что задача удалена
-                    isLoading = false
+                    isLoading = false,
+                    showDeleteConfirmDialog = false
                 )
             } catch (e: IOException) {
                 _state.value = _state.value.copy(
-                    error = "Не удалось удалить задачу: ${e.message}"
+                    error = "Не удалось удалить задачу: ${e.message}",
+                    showDeleteConfirmDialog = false
                 )
             }
         }
     }
 
+    fun dismissDeleteDialog() {
+        _state.value = _state.value.copy(
+            showDeleteConfirmDialog = false
+        )
+    }
+
     fun toggleDeleteDialog() {
         _state.value = _state.value.copy(
-            showDeleteDialog = !state.value.showDeleteDialog
+            showDeleteConfirmDialog = !state.value.showDeleteConfirmDialog // Используем правильное поле
         )
     }
 

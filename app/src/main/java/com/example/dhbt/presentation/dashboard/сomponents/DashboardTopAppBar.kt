@@ -40,9 +40,9 @@ fun DashboardTopAppBar(
                     exit = fadeOut()
                 ) {
                     Text(
-                        text = "Привет, $userName!",
+                        text = "Добрый день!",
                         style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

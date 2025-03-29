@@ -47,6 +47,23 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun saveTaskRecurrence(recurrence: TaskRecurrence) {
+        val recurrenceEntity = taskRecurrenceMapper.mapToEntity(recurrence)
+        taskRecurrenceDao.insertTaskRecurrence(recurrenceEntity)
+    }
+
+    override suspend fun deleteTaskRecurrence(taskId: String) {
+        taskRecurrenceDao.deleteRecurrenceForTask(taskId)
+    }
+
+    override suspend fun deleteTagsForTask(taskId: String) {
+        taskTagDao.deleteAllTagsForTask(taskId)
+    }
+
+    override suspend fun deleteSubtasksForTask(taskId: String) {
+        subtaskDao.deleteSubtasksForTask(taskId)
+    }
+
     override suspend fun updateTaskStatus(taskId: String, status: TaskStatus) {
         // Получаем задачу
         val task = taskDao.getTaskById(taskId)
@@ -245,26 +262,16 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addTask(task: Task): String {
+        // Генерируем идентификатор для задачи, если он не был предоставлен
+        val taskId = task.id
+
+        // Создаем entity для вставки
         val taskEntity = taskMapper.mapToEntity(task)
-        val taskId = taskDao.insertTask(taskEntity).toString()
 
-        // Добавляем подзадачи, если есть
-        task.subtasks.forEach { subtask ->
-            val subtaskEntity = subtaskMapper.mapToEntity(subtask.copy(taskId = taskId))
-            subtaskDao.insertSubtask(subtaskEntity)
-        }
+        // Сохраняем задачу и возвращаем созданный ID
+        taskDao.insertTask(taskEntity)
 
-        // Добавляем повторение задачи, если есть
-        task.recurrence?.let { recurrence ->
-            val recurrenceEntity = taskRecurrenceMapper.mapToEntity(recurrence.copy(taskId = taskId))
-            taskRecurrenceDao.insertTaskRecurrence(recurrenceEntity)
-        }
-
-        // Добавляем связи с тегами
-        task.tags.forEach { tag ->
-            taskTagDao.insertTaskTagCrossRef(TaskTagCrossRef(taskId, tag.id))
-        }
-
+        // Возвращаем исходный ID задачи
         return taskId
     }
 

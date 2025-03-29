@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,81 +40,84 @@ fun RecurrenceSection(
     onMonthDayChanged: (Int?) -> Unit,
     onCustomIntervalChanged: (Int?) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(selectedType != null) }
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(title = stringResource(R.string.recurrence))
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Опции повторяемости
-        RecurrenceTypeSelector(
-            selectedType = selectedType,
-            onTypeSelected = onTypeSelected
-        )
-
-        // Дополнительные настройки в зависимости от выбранного типа
-        AnimatedVisibility(
-            visible = selectedType != null,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
+        // Заголовок с возможностью раскрытия/скрытия
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-            ) {
-                when (selectedType) {
-                    RecurrenceType.WEEKLY -> {
-                        Text(
-                            text = stringResource(R.string.repeat_on_days),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            Text(
+                text = stringResource(R.string.recurrence),
+                style = MaterialTheme.typography.titleMedium
+            )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null
+            )
+        }
 
-                        DaysOfWeekSelector(
-                            selectedDays = selectedDays,
-                            onDayToggled = onDayToggled
-                        )
+        // Содержимое раздела
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                // Выбор типа повторения
+                Text(
+                    text = stringResource(R.string.repeat), // Изменено на доступный ресурс
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                RecurrenceTypeSelector(
+                    selectedType = selectedType,
+                    onTypeSelected = onTypeSelected
+                )
+
+                // Дополнительные настройки в зависимости от типа
+                AnimatedVisibility(visible = selectedType != null) {
+                    Column(modifier = Modifier.padding(top = 16.dp)) {
+                        when (selectedType) {
+                            RecurrenceType.WEEKLY -> {
+                                DaysOfWeekSelector( // Исправлено на правильное имя
+                                    selectedDays = selectedDays,
+                                    onDayToggled = onDayToggled
+                                )
+                            }
+                            RecurrenceType.MONTHLY -> {
+                                MonthDaySelector(
+                                    selectedDay = monthDay,
+                                    onDayChanged = onMonthDayChanged
+                                )
+                            }
+                            RecurrenceType.CUSTOM -> {
+                                CustomIntervalInput( // Исправлено на правильное имя
+                                    interval = customInterval,
+                                    onIntervalChanged = onCustomIntervalChanged
+                                )
+                            }
+                            else -> { /* Для других типов доп. настройки не требуются */ }
+                        }
                     }
+                }
 
-                    RecurrenceType.MONTHLY -> {
-                        Text(
-                            text = stringResource(R.string.repeat_on_day_of_month),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        MonthDaySelector(
-                            selectedDay = monthDay,
-                            onDayChanged = onMonthDayChanged
-                        )
-                    }
-
-                    RecurrenceType.CUSTOM -> {
-                        Text(
-                            text = stringResource(R.string.repeat_every_x_days),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        CustomIntervalInput(
-                            interval = customInterval,
-                            onIntervalChanged = onCustomIntervalChanged
-                        )
-                    }
-
-                    else -> {} // Для DAILY и YEARLY не нужны дополнительные настройки
+                // Предупреждение о потенциальных проблемах
+                if (selectedType != null) {
+                    Text(
+                        text = stringResource(R.string.warning), // Изменено на доступный ресурс
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
         }
     }
 }
-
 @Composable
 fun RecurrenceTypeSelector(
     selectedType: RecurrenceType?,

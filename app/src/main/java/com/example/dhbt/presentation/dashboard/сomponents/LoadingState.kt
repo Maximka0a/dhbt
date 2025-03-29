@@ -1,6 +1,10 @@
 package com.example.dhbt.presentation.dashboard.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,53 +54,55 @@ fun EmptyDashboardState(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Заголовок
-        Text(
-            text = stringResource(R.string.empty_dashboard_title),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
+        Icon(
+            imageVector = Icons.Outlined.Dashboard,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Описание
         Text(
-            text = stringResource(R.string.empty_dashboard_subtitle),
+            text = stringResource(R.string.empty_dashboard_message),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Кнопки действий
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.width(IntrinsicSize.Min)
+        // Прямоугольные кнопки вместо круглых
+        Button(
+            onClick = onAddTask,
+            shape = RoundedCornerShape(8.dp), // Прямоугольник со скругленными углами
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            ),
+            modifier = Modifier.width(200.dp)
         ) {
-            // Кнопка добавления задачи
-            Button(
-                onClick = onAddTask,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Text(text = stringResource(R.string.add_task))
-            }
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.add_task))
+        }
 
-            // Кнопка добавления привычки
-            OutlinedButton(
-                onClick = onAddHabit,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Text(text = stringResource(R.string.add_habit))
-            }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onAddHabit,
+            shape = RoundedCornerShape(8.dp), // Прямоугольник со скругленными углами
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary
+            ),
+            modifier = Modifier.width(200.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.add_habit))
         }
     }
 }

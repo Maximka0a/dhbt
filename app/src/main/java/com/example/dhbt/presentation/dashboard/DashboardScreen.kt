@@ -32,6 +32,7 @@ fun DashboardScreen(
     onViewAllHabits: () -> Unit,
     onSettings: () -> Unit,
     onPremiumClicked: () -> Unit,
+    onStatisticsClick: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -110,7 +111,8 @@ fun DashboardScreen(
                     onDeleteTask = viewModel::onDeleteTask,
                     onHabitProgressIncrement = viewModel::onHabitProgressIncrement,
                     onViewAllTasks = onViewAllTasks,
-                    onViewAllHabits = onViewAllHabits
+                    onViewAllHabits = onViewAllHabits,
+                    onStatisticsClick = onStatisticsClick
                 )
             }
 

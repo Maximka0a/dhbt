@@ -44,6 +44,12 @@ import com.example.dhbt.presentation.task.detail.components.TaskDetailContent
 import com.example.dhbt.presentation.task.detail.components.TaskDetailTopAppBar
 import com.example.dhbt.presentation.task.detail.components.TaskErrorState
 import com.example.dhbt.presentation.task.detail.components.TaskLoadingState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.dhbt.presentation.task.detail.components.TaskStatusOptionsMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +66,21 @@ fun TaskDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showStatusOptions by remember { mutableStateOf(false) }
+
+
+    // Добавьте этот блок - он будет вызывать обновление данных при навигации обратно на экран
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.reloadTaskDetails()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
 
     LaunchedEffect(state.error) {
@@ -97,7 +118,7 @@ fun TaskDetailScreen(
                 isArchived = state.task?.status == TaskStatus.ARCHIVED,
                 onNavigateBack = onNavigateBack,
                 onEdit = { viewModel.toggleEditTask() },
-                onDelete = { state.showDeleteConfirmDialog = true },
+                onDelete = { viewModel.toggleDeleteDialog()},
                 scrollBehavior = scrollBehavior
             )
         },
@@ -177,7 +198,11 @@ fun TaskDetailScreen(
                 TaskDetailContent(
                     state = state,
                     onSubtaskToggle = viewModel::toggleSubtaskCompletion,
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
+                    onDeleteTask = {
+                        viewModel.toggleDeleteDialog()
+                    },
+                    onNavigateToPomodoro = onNavigateToPomodoro
                 )
             }
         }
@@ -186,14 +211,13 @@ fun TaskDetailScreen(
     // Диалог подтверждения удаления
     if (state.showDeleteConfirmDialog) {
         AlertDialog(
-            onDismissRequest = { state.showDeleteConfirmDialog = false },
+            onDismissRequest = { viewModel.dismissDeleteDialog() },
             title = { Text(stringResource(R.string.confirm_delete_task)) },
             text = { Text(stringResource(R.string.delete_task_confirmation)) },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.deleteTask()
-                        state.showDeleteConfirmDialog = false
+                        viewModel.deleteTask() // deleteTask должен сам сбрасывать флаг
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
@@ -204,7 +228,7 @@ fun TaskDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { state.showDeleteConfirmDialog= false }) {
+                TextButton(onClick = { viewModel.dismissDeleteDialog() }) {
                     Text(stringResource(R.string.cancel))
                 }
             }

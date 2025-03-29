@@ -1,14 +1,30 @@
 package com.example.dhbt.presentation.task.list
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -18,21 +34,75 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.LowPriority
+import androidx.compose.material.icons.outlined.PriorityHigh
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.SortByAlpha
+import androidx.compose.material.icons.outlined.Update
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -48,6 +118,7 @@ import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskStatus
+import com.example.dhbt.presentation.dashboard.components.SwipeableTaskItem
 import com.example.dhbt.presentation.shared.EmojiIcon
 import com.example.dhbt.presentation.shared.EmptyStateWithIcon
 import com.example.dhbt.presentation.util.toColor
@@ -81,50 +152,37 @@ fun TasksScreen(
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Состояния UI
-    var isCalendarExpanded by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
-    var isSearchActive by remember { mutableStateOf(false) }
-    var expandedFilterSection by remember { mutableStateOf(false) }
-
+    // Track which UI section is currently expanded
+    var expandedSection by remember { mutableStateOf<ExpandedSection?>(null) }
     val searchFocusRequester = remember { FocusRequester() }
 
-    // Анимации
-    val searchBarHeight by animateFloatAsState(
-        targetValue = if (isSearchActive) 1f else 0f,
-        label = "searchBarHeight"
-    )
+    // Helper functions to manage expanded sections
+    fun toggleSection(section: ExpandedSection) {
+        expandedSection = if (expandedSection == section) null else section
+
+        // If switching to search section, request focus after a short delay
+        if (expandedSection == ExpandedSection.SEARCH) {
+            scope.launch {
+                delay(100)
+                searchFocusRequester.requestFocus()
+            }
+        } else {
+            // If not in search, hide keyboard
+            keyboardController?.hide()
+        }
+    }
 
     Scaffold(
         topBar = {
             TasksTopAppBar(
-                isSearchActive = isSearchActive,
-                onSearchActiveChange = { active ->
-                    isSearchActive = active
-                    if (active) {
-                        scope.launch {
-                            delay(100) // Небольшая задержка для анимации
-                            searchFocusRequester.requestFocus()
-                        }
-                    } else {
-                        keyboardController?.hide()
-                        // Если пользователь закрывает поиск, очищаем поисковый запрос
-                        if (filterState.searchQuery.isNotEmpty()) {
-                            viewModel.onSearchQueryChanged("")
-                        }
-                    }
-                },
-                searchQuery = filterState.searchQuery,
-                onSearchQueryChanged = { query -> viewModel.onSearchQueryChanged(query) },
-                onClearSearch = { viewModel.onSearchQueryChanged("") },
-                onSearchSubmit = { keyboardController?.hide() },
-                onSortClicked = { showSortMenu = !showSortMenu },
-                onExpandFilterClicked = { expandedFilterSection = !expandedFilterSection },
+                expandedSection = expandedSection,
+                onSectionToggle = { section -> toggleSection(section) },
                 isFiltersActive = filterState != TaskFilterState(),
                 onResetFilters = { viewModel.resetFilters() },
-                onToggleEisenhowerMatrix = { viewModel.onToggleEisenhowerMatrix(it) },
                 showEisenhowerMatrix = filterState.showEisenhowerMatrix,
-                searchFocusRequester = searchFocusRequester,
+                onToggleEisenhowerMatrix = { show ->
+                    viewModel.onToggleEisenhowerMatrix(show)
+                },
                 filterState = filterState
             )
         },
@@ -152,9 +210,9 @@ fun TasksScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Расширенная панель фильтров (отображается, когда пользователь нажимает на фильтр)
+            // Expanded filter section
             AnimatedVisibility(
-                visible = expandedFilterSection,
+                visible = expandedSection == ExpandedSection.FILTER,
                 enter = fadeIn() + expandVertically(animationSpec = tween(300)),
                 exit = fadeOut() + shrinkVertically(animationSpec = tween(300))
             ) {
@@ -169,27 +227,20 @@ fun TasksScreen(
                 )
             }
 
-            // Календарь (компактный или развернутый)
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                TaskCalendarView(
-                    isExpanded = isCalendarExpanded,
-                    onExpandToggle = { isCalendarExpanded = !isCalendarExpanded },
-                    selectedDate = filterState.selectedDate,
-                    onDateSelected = { date ->
-                        viewModel.onDateSelected(
-                            // Если выбрана та же дата, сбрасываем фильтрацию
-                            if (date == filterState.selectedDate) null else date
-                        )
-                    },
-                    datesWithTasks = datesWithTasks
-                )
-            }
+            // Calendar (compact or expanded)
+            TaskCalendarView(
+                isExpanded = expandedSection == ExpandedSection.CALENDAR,
+                onExpandToggle = { toggleSection(ExpandedSection.CALENDAR) },
+                selectedDate = filterState.selectedDate,
+                onDateSelected = { date ->
+                    viewModel.onDateSelected(
+                        if (date == filterState.selectedDate) null else date
+                    )
+                },
+                datesWithTasks = datesWithTasks
+            )
 
-            // Фильтр по категориям
+            // Category filter
             if (categories.isNotEmpty()) {
                 CategoryFilterRow(
                     categories = categories,
@@ -202,9 +253,30 @@ fun TasksScreen(
                 )
             }
 
-            // Меню сортировки (отображается при нажатии на кнопку сортировки)
+            // Search bar
             AnimatedVisibility(
-                visible = showSortMenu,
+                visible = expandedSection == ExpandedSection.SEARCH,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                SearchBar(
+                    searchQuery = filterState.searchQuery,
+                    onSearchQueryChanged = { query -> viewModel.onSearchQueryChanged(query) },
+                    onClearSearch = {
+                        viewModel.onSearchQueryChanged("")
+                        toggleSection(ExpandedSection.SEARCH) // Close search
+                    },
+                    onSearchSubmit = {
+                        keyboardController?.hide()
+                    },
+                    searchFocusRequester = searchFocusRequester,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            // Sort menu
+            AnimatedVisibility(
+                visible = expandedSection == ExpandedSection.SORT,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
@@ -212,12 +284,12 @@ fun TasksScreen(
                     currentSortOption = filterState.sortOption,
                     onSortOptionSelected = {
                         viewModel.onSortOptionSelected(it)
-                        showSortMenu = false
+                        expandedSection = null // Close sort menu
                     }
                 )
             }
 
-            // Список задач или матрица Эйзенхауэра
+            // Task list or Eisenhower matrix
             if (state.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -237,18 +309,11 @@ fun TasksScreen(
                     onTaskStatusChange = { taskId, isCompleted ->
                         viewModel.onTaskStatusChanged(taskId, isCompleted)
                     },
+                    onTaskToggle = { taskId ->
+                        viewModel.toggleTaskStatus(taskId)
+                    },
                     onTaskDelete = { taskId ->
                         viewModel.onDeleteTask(taskId)
-                        scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = "Задача удалена",
-                                actionLabel = "Отменить",
-                                duration = SnackbarDuration.Short
-                            )
-                            if (result == SnackbarResult.ActionPerformed) {
-                                // TODO: Реализовать восстановление задачи
-                            }
-                        }
                     }
                 )
             } else {
@@ -258,31 +323,14 @@ fun TasksScreen(
                     onTaskStatusChange = { taskId, isCompleted ->
                         viewModel.onTaskStatusChanged(taskId, isCompleted)
                     },
+                    onTaskToggle = { taskId ->  // Add this new parameter
+                        viewModel.toggleTaskStatus(taskId)
+                    },
                     onTaskDelete = { taskId ->
                         viewModel.onDeleteTask(taskId)
-                        scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = "Задача удалена",
-                                actionLabel = "Отменить",
-                                duration = SnackbarDuration.Short
-                            )
-                            if (result == SnackbarResult.ActionPerformed) {
-                                // TODO: Реализовать восстановление задачи
-                            }
-                        }
                     },
                     onTaskArchive = { taskId ->
                         viewModel.onArchiveTask(taskId)
-                        scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = "Задача архивирована",
-                                actionLabel = "Отменить",
-                                duration = SnackbarDuration.Short
-                            )
-                            if (result == SnackbarResult.ActionPerformed) {
-                                // TODO: Реализовать восстановление задачи из архива
-                            }
-                        }
                     }
                 )
             }
@@ -290,133 +338,96 @@ fun TasksScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+// Enum to track which section is expanded
+enum class ExpandedSection {
+    SEARCH, FILTER, SORT, CALENDAR
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksTopAppBar(
-    isSearchActive: Boolean,
-    onSearchActiveChange: (Boolean) -> Unit,
-    searchQuery: String,
-    onSearchQueryChanged: (String) -> Unit,
-    onClearSearch: () -> Unit,
-    onSearchSubmit: () -> Unit,
-    onSortClicked: () -> Unit,
-    onExpandFilterClicked: () -> Unit,
+    expandedSection: ExpandedSection?,
+    onSectionToggle: (ExpandedSection) -> Unit,
     isFiltersActive: Boolean,
     onResetFilters: () -> Unit,
-    onToggleEisenhowerMatrix: (Boolean) -> Unit,
     showEisenhowerMatrix: Boolean,
-    searchFocusRequester: FocusRequester,
+    onToggleEisenhowerMatrix: (Boolean) -> Unit,
     filterState: TaskFilterState
 ) {
     Column {
-        // Основной верхний бар
+        // Main top bar
         TopAppBar(
             title = {
-                if (!isSearchActive) {
-                    Text(stringResource(R.string.tasks))
-                }
+                Text(stringResource(R.string.tasks))
             },
             actions = {
-                // Поиск (значок или поле ввода)
-                if (isSearchActive) {
-                    // Поле поиска
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChanged,
-                        placeholder = { Text(stringResource(R.string.search_tasks)) },
-                        singleLine = true,
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = onClearSearch) {
-                                    Icon(
-                                        Icons.Default.Clear,
-                                        contentDescription = stringResource(R.string.clear)
-                                    )
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 8.dp)
-                            .focusRequester(searchFocusRequester),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(24.dp)
+                // Search button
+                IconButton(onClick = { onSectionToggle(ExpandedSection.SEARCH) }) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = stringResource(R.string.search),
+                        tint = if (expandedSection == ExpandedSection.SEARCH)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            LocalContentColor.current
                     )
-                } else {
-                    // Кнопка поиска
-                    IconButton(onClick = { onSearchActiveChange(true) }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = stringResource(R.string.search)
-                        )
-                    }
+                }
 
-                    // Кнопка фильтров
-                    IconButton(onClick = onExpandFilterClicked) {
-                        BadgedBox(
-                            badge = {
-                                if (isFiltersActive) {
-                                    Badge { Text("!") }
-                                }
+                // Filter button
+                IconButton(onClick = { onSectionToggle(ExpandedSection.FILTER) }) {
+                    BadgedBox(
+                        badge = {
+                            if (isFiltersActive) {
+                                Badge { Text("!") }
                             }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FilterList,
-                                contentDescription = stringResource(R.string.filter)
-                            )
                         }
-                    }
-
-                    // Кнопка сортировки
-                    IconButton(onClick = onSortClicked) {
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Sort,
-                            contentDescription = stringResource(R.string.sort)
-                        )
-                    }
-
-                    // Кнопка матрицы Эйзенхауэра
-                    IconButton(onClick = { onToggleEisenhowerMatrix(!showEisenhowerMatrix) }) {
-                        Icon(
-                            imageVector = Icons.Outlined.GridView,
-                            contentDescription = stringResource(R.string.eisenhower_matrix),
-                            tint = if (showEisenhowerMatrix)
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = stringResource(R.string.filter),
+                            tint = if (expandedSection == ExpandedSection.FILTER)
                                 MaterialTheme.colorScheme.primary
                             else
                                 LocalContentColor.current
                         )
                     }
-
-                    // Кнопка сброса фильтров (отображается только когда фильтры активны)
-                    AnimatedVisibility(visible = isFiltersActive) {
-                        IconButton(onClick = onResetFilters) {
-                            Icon(
-                                imageVector = Icons.Default.RestartAlt,
-                                contentDescription = stringResource(R.string.reset_filters),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
                 }
-            },
-            navigationIcon = {
-                if (isSearchActive) {
-                    IconButton(onClick = { onSearchActiveChange(false) }) {
+
+                // Sort button
+                IconButton(onClick = { onSectionToggle(ExpandedSection.SORT) }) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = stringResource(R.string.sort),
+                        tint = if (expandedSection == ExpandedSection.SORT)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            LocalContentColor.current
+                    )
+                }
+
+                // Eisenhower matrix button
+                IconButton(
+                    onClick = {
+                        onToggleEisenhowerMatrix(!showEisenhowerMatrix)  // Use callback
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.GridView,
+                        contentDescription = stringResource(R.string.eisenhower_matrix),
+                        tint = if (showEisenhowerMatrix)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            LocalContentColor.current
+                    )
+                }
+
+                // Reset filters button (only shown when filters are active)
+                AnimatedVisibility(visible = isFiltersActive) {
+                    IconButton(onClick = onResetFilters) {
                         Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.close_search)
+                            imageVector = Icons.Default.RestartAlt,
+                            contentDescription = stringResource(R.string.reset_filters),
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -426,96 +437,155 @@ fun TasksTopAppBar(
                 titleContentColor = MaterialTheme.colorScheme.onSurface
             )
         )
-
-        // Индикатор активных фильтров
-        if (isFiltersActive && !isSearchActive) {
-            ActiveFiltersIndicator(
-                filterState = filterState,
-                onResetFilters = onResetFilters
-            )
-        }
     }
 }
 
 @Composable
-fun ActiveFiltersIndicator(
-    filterState: TaskFilterState,
-    onResetFilters: () -> Unit
+fun TaskCalendarView(
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit,
+    selectedDate: LocalDate?,
+    onDateSelected: (LocalDate) -> Unit,
+    datesWithTasks: Set<LocalDate>
 ) {
-    Row(
+    val today = LocalDate.now()
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
-        Icon(
-            imageVector = Icons.Default.FilterAlt,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
-        )
+        Column {
+            // Calendar header with expand button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Current or selected date display
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DateRange,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
 
-        Text(
-            text = buildFilterDescription(filterState),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp)
-        )
+                    Spacer(modifier = Modifier.width(8.dp))
 
-        TextButton(
-            onClick = onResetFilters,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.clear_all),
-                style = MaterialTheme.typography.bodySmall
-            )
+                    Text(
+                        text = if (selectedDate != null) {
+                            selectedDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))
+                        } else {
+                            stringResource(R.string.today) + ": " +
+                                    today.format(DateTimeFormatter.ofPattern("d MMMM"))
+                        },
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                // Button to expand/collapse calendar
+                val rotationAngle by animateFloatAsState(
+                    targetValue = if (isExpanded) 180f else 0f,
+                    label = "calendarExpand"
+                )
+
+                IconButton(onClick = onExpandToggle) {
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded)
+                            stringResource(R.string.collapse)
+                        else
+                            stringResource(R.string.expand),
+                        modifier = Modifier.rotate(rotationAngle)
+                    )
+                }
+            }
+
+            // Show simplified calendar when expanded
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                SimpleCalendarView(
+                    selectedDate = selectedDate,
+                    onDateSelected = onDateSelected,
+                    datesWithTasks = datesWithTasks
+                )
+            }
         }
     }
 }
 
+// Search Bar component
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun buildFilterDescription(filterState: TaskFilterState): String {
-    val filters = mutableListOf<String>()
-
-    filterState.selectedDate?.let {
-        filters.add("Дата: ${it.format(DateTimeFormatter.ofPattern("d MMM"))}")
-    }
-
-    filterState.selectedCategoryId?.let {
-        filters.add("Категория")
-    }
-
-    filterState.selectedStatus?.let {
-        val statusName = when(it) {
-            TaskStatus.ACTIVE -> stringResource(R.string.active)
-            TaskStatus.COMPLETED -> stringResource(R.string.completed)
-            TaskStatus.ARCHIVED -> stringResource(R.string.archived)
+fun SearchBar(
+    searchQuery: String,
+    onSearchQueryChanged: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onSearchSubmit: () -> Unit,
+    searchFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChanged,
+                placeholder = { Text(stringResource(R.string.search_tasks)) },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null
+                    )
+                },
+                trailingIcon = {
+                    IconButton(onClick = onClearSearch) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.close_search)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(searchFocusRequester),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = RoundedCornerShape(24.dp)
+            )
         }
-        filters.add("Статус: $statusName")
     }
-
-    filterState.selectedPriority?.let {
-        val priorityName = when(it) {
-            TaskPriority.HIGH -> stringResource(R.string.high)
-            TaskPriority.MEDIUM -> stringResource(R.string.medium)
-            TaskPriority.LOW -> stringResource(R.string.low)
-        }
-        filters.add("Приоритет: $priorityName")
-    }
-
-    if (filterState.selectedTagIds.isNotEmpty()) {
-        filters.add("Теги: ${filterState.selectedTagIds.size}")
-    }
-
-    if (filterState.searchQuery.isNotEmpty()) {
-        filters.add("Поиск: \"${filterState.searchQuery}\"")
-    }
-
-    return filters.joinToString(" | ")
 }
 
 @Composable
@@ -601,94 +671,6 @@ fun ExpandedFilterSection(
     }
 }
 
-@Composable
-fun TaskCalendarView(
-    isExpanded: Boolean,
-    onExpandToggle: () -> Unit,
-    selectedDate: LocalDate?,
-    onDateSelected: (LocalDate) -> Unit,
-    datesWithTasks: Set<LocalDate>
-) {
-    val today = LocalDate.now()
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Column {
-            // Заголовок календаря с кнопкой разворачивания
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Отображение текущей или выбранной даты
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DateRange,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = if (selectedDate != null) {
-                            selectedDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))
-                        } else {
-                            stringResource(R.string.today) + ": " +
-                                    today.format(DateTimeFormatter.ofPattern("d MMMM"))
-                        },
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                // Кнопка для сворачивания/разворачивания календаря
-                val rotationAngle by animateFloatAsState(
-                    targetValue = if (isExpanded) 180f else 0f,
-                    label = "calendarExpand"
-                )
-
-                IconButton(onClick = onExpandToggle) {
-                    Icon(
-                        imageVector = Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded)
-                            stringResource(R.string.collapse)
-                        else
-                            stringResource(R.string.expand),
-                        modifier = Modifier.rotate(rotationAngle)
-                    )
-                }
-            }
-
-            // Отображение упрощенного календаря, если он развернут
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                SimpleCalendarView(
-                    selectedDate = selectedDate,
-                    onDateSelected = onDateSelected,
-                    datesWithTasks = datesWithTasks
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun SimpleCalendarView(
@@ -983,224 +965,138 @@ fun TasksList(
     tasks: List<Task>,
     onTaskClick: (String) -> Unit,
     onTaskStatusChange: (String, Boolean) -> Unit,
+    onTaskToggle: (String) -> Unit,
     onTaskDelete: (String) -> Unit,
     onTaskArchive: (String) -> Unit
 ) {
+    // 1. Group tasks by date
+    val today = LocalDate.now()
+    val yesterday = today.minusDays(1)
+
+    // Create a map to group tasks by their date
+    val groupedTasks = tasks.groupBy { task ->
+        task.dueDate?.let { millis ->
+            Instant.ofEpochMilli(millis)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+        } ?: LocalDate.MAX // Tasks with no due date will be grouped separately
+    }.toSortedMap() // Sort the map by date
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = 8.dp,
-            bottom = 88.dp
-        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(
-            items = tasks,
-            key = { it.id }
-        ) { task ->
-            TaskItem(
-                task = task,
-                onClick = { onTaskClick(task.id) },
-                onStatusChange = { isCompleted -> onTaskStatusChange(task.id, isCompleted) },
-                onDelete = { onTaskDelete(task.id) },
-                onArchive = { onTaskArchive(task.id) },
-                modifier = Modifier.animateItemPlacement()
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-fun TaskItem(
-    task: Task,
-    onClick: () -> Unit,
-    onStatusChange: (Boolean) -> Unit,
-    onDelete: () -> Unit,
-    onArchive: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val deleteAction = SwipeAction(
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(R.string.delete),
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        background = Color.Red,
-        onSwipe = onDelete
-    )
-
-    val archiveAction = SwipeAction(
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Archive,
-                contentDescription = stringResource(R.string.archive),
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        background = MaterialTheme.colorScheme.tertiary,
-        onSwipe = onArchive
-    )
-
-    SwipeableActionsBox(
-        startActions = listOf(archiveAction),
-        endActions = listOf(deleteAction),
-        swipeThreshold = 96.dp,
-        modifier = modifier
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 2.dp
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Чекбокс для изменения статуса задачи
-                Checkbox(
-                    checked = task.status == TaskStatus.COMPLETED,
-                    onCheckedChange = { isChecked -> onStatusChange(isChecked) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = when (task.priority) {
-                            TaskPriority.HIGH -> MaterialTheme.colorScheme.error
-                            TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
-                            TaskPriority.LOW -> MaterialTheme.colorScheme.primary
-                        }
+        // For tasks with no due date - show at the top
+        groupedTasks[LocalDate.MAX]?.let { tasksWithNoDate ->
+            if (tasksWithNoDate.isNotEmpty()) {
+                stickyHeader {
+                    DateHeader(
+                        date = null,
+                        text = stringResource(R.string.no_date)
                     )
-                )
-
-                // Основное содержимое задачи
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp)
-                ) {
-                    // Название задачи
-                    Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (task.status == TaskStatus.COMPLETED)
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        else
-                            MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (task.status == TaskStatus.COMPLETED)
-                            TextDecoration.LineThrough
-                        else
-                            null,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    // Дополнительная информация (дата, категория)
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Срок выполнения
-                        task.dueDate?.let { dueDate ->
-                            val localDate = Instant.ofEpochMilli(dueDate)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-
-                            val dateColor = when {
-                                task.status == TaskStatus.COMPLETED -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                localDate.isBefore(LocalDate.now()) -> MaterialTheme.colorScheme.error
-                                localDate.isEqual(LocalDate.now()) -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Event,
-                                    contentDescription = null,
-                                    tint = dateColor,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = formatDueDate(localDate),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = dateColor
-                                )
-                            }
-                        }
-
-                        // Категория (необходимо получить из категорий по ID)
-                        task.categoryId?.let { categoryId ->
-                            // Получаем цвет из задачи, если он есть
-                            val categoryColor = task.color?.toColor() ?: MaterialTheme.colorScheme.primary
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(categoryColor, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = categoryId, // В идеале здесь должно быть имя категории
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
                 }
 
-                // Индикатор приоритета
-                Box(
-                    modifier = Modifier
-                        .size(width = 4.dp, height = 40.dp)
-                        .background(
-                            color = when (task.priority) {
-                                TaskPriority.HIGH -> MaterialTheme.colorScheme.error
-                                TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
-                                TaskPriority.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                            },
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
+                items(
+                    items = tasksWithNoDate,
+                    key = { it.id }
+                ) { task ->
+                    SwipeableTaskItem(
+                        task = task,
+                        onTaskClick = onTaskClick,
+                        onTaskCompleteChange = { isCompleted ->
+                            onTaskStatusChange(task.id, isCompleted)
+                        },
+                        onToggleTaskStatus = {
+                            onTaskToggle(task.id)
+                        },
+                        onDeleteTask = { onTaskDelete(task.id) },
+                        modifier = Modifier.animateItemPlacement()
+                    )
+                }
             }
         }
+
+        // For each date group (excluding MAX)
+        groupedTasks.entries
+            .filter { it.key != LocalDate.MAX }
+            .forEach { (date, tasksForDate) ->
+                // Display a sticky header for this date group
+                stickyHeader {
+                    DateHeader(
+                        date = date,
+                        text = when {
+                            date.isEqual(today) -> stringResource(R.string.today)
+                            date.isEqual(yesterday) -> stringResource(R.string.yesterday)
+                            date.year == today.year -> date.format(DateTimeFormatter.ofPattern("d MMMM"))
+                            else -> date.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))
+                        }
+                    )
+                }
+
+                // Display the tasks for this date
+                items(
+                    items = tasksForDate,
+                    key = { it.id }
+                ) { task ->
+                    SwipeableTaskItem(
+                        task = task,
+                        onTaskClick = onTaskClick,
+                        onTaskCompleteChange = { isCompleted ->
+                            onTaskStatusChange(task.id, isCompleted)
+                        },
+                        onToggleTaskStatus = {
+                            onTaskToggle(task.id)
+                        },
+                        onDeleteTask = { onTaskDelete(task.id) },
+                        modifier = Modifier.animateItemPlacement()
+                    )
+                }
+            }
     }
 }
 
 @Composable
-fun formatDueDate(date: LocalDate): String {
-    val today = LocalDate.now()
-    val tomorrow = today.plusDays(1)
+fun DateHeader(date: LocalDate?, text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Calendar icon
+            Icon(
+                imageVector = Icons.Outlined.Event,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
 
-    return when {
-        date.isEqual(today) -> stringResource(R.string.today)
-        date.isEqual(tomorrow) -> stringResource(R.string.tomorrow)
-        date.isBefore(today) -> stringResource(R.string.overdue) + ": " +
-                date.format(DateTimeFormatter.ofPattern("d MMM"))
-        date.year == today.year -> date.format(DateTimeFormatter.ofPattern("d MMM"))
-        else -> date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Date text
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Count of tasks for this date
+            date?.let {
+                val count = 0 // You might want to calculate or pass this
+                if (count > 0) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1209,6 +1105,7 @@ fun EisenhowerMatrix(
     tasks: List<Task>,
     onTaskClick: (String) -> Unit,
     onTaskStatusChange: (String, Boolean) -> Unit,
+    onTaskToggle: (String) -> Unit, // Добавляем новый параметр
     onTaskDelete: (String) -> Unit
 ) {
     // Преобразуем даты задач в LocalDate для сравнения
@@ -1273,6 +1170,7 @@ fun EisenhowerMatrix(
                 tasks = urgentImportant,
                 onTaskClick = onTaskClick,
                 onTaskStatusChange = onTaskStatusChange,
+                onTaskToggle = onTaskToggle, // Передаем параметр
                 onTaskDelete = onTaskDelete,
                 modifier = Modifier.weight(1f)
             )
@@ -1284,6 +1182,7 @@ fun EisenhowerMatrix(
                 tasks = nonUrgentImportant,
                 onTaskClick = onTaskClick,
                 onTaskStatusChange = onTaskStatusChange,
+                onTaskToggle = onTaskToggle, // Передаем параметр
                 onTaskDelete = onTaskDelete,
                 modifier = Modifier.weight(1f)
             )
@@ -1301,6 +1200,7 @@ fun EisenhowerMatrix(
                 tasks = urgentNotImportant,
                 onTaskClick = onTaskClick,
                 onTaskStatusChange = onTaskStatusChange,
+                onTaskToggle = onTaskToggle, // Передаем параметр
                 onTaskDelete = onTaskDelete,
                 modifier = Modifier.weight(1f)
             )
@@ -1312,6 +1212,7 @@ fun EisenhowerMatrix(
                 tasks = nonUrgentNotImportant,
                 onTaskClick = onTaskClick,
                 onTaskStatusChange = onTaskStatusChange,
+                onTaskToggle = onTaskToggle, // Передаем параметр
                 onTaskDelete = onTaskDelete,
                 modifier = Modifier.weight(1f)
             )
@@ -1326,6 +1227,7 @@ fun EisenhowerQuadrant(
     tasks: List<Task>,
     onTaskClick: (String) -> Unit,
     onTaskStatusChange: (String, Boolean) -> Unit,
+    onTaskToggle: (String) -> Unit,
     onTaskDelete: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1378,7 +1280,12 @@ fun EisenhowerQuadrant(
                         CompactTaskItem(
                             task = task,
                             onClick = { onTaskClick(task.id) },
-                            onStatusChange = { isCompleted -> onTaskStatusChange(task.id, isCompleted) }
+                            onStatusChange = { isCompleted ->
+                                onTaskStatusChange(task.id, isCompleted)
+                            },
+                            onTaskToggle = {
+                                onTaskToggle(task.id)
+                            }
                         )
                     }
                 }
@@ -1386,23 +1293,60 @@ fun EisenhowerQuadrant(
         }
     }
 }
-
 @Composable
 fun CompactTaskItem(
     task: Task,
     onClick: () -> Unit,
-    onStatusChange: (Boolean) -> Unit
+    onStatusChange: (Boolean) -> Unit,
+    onTaskToggle: () -> Unit, // Новый параметр
+    modifier: Modifier = Modifier
 ) {
+    // Для обнаружения долгого нажатия
+    var isPressed by remember { mutableStateOf(false) }
+    val hapticFeedback = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+
+    // Анимация масштабирования
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 1.05f else 1.0f,
+        animationSpec = tween(200),
+        label = "scaleAnimation"
+    )
+
+    // Анимация подъема
+    val elevation by animateFloatAsState(
+        targetValue = if (isPressed) 4f else 1f,
+        animationSpec = tween(200),
+        label = "elevationAnimation"
+    )
+
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .scale(scale) // Применяем анимацию масштаба
+            .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isPressed = true
+
+                        // Используем onTaskToggle вместо onStatusChange
+                        onTaskToggle()
+
+                        scope.launch {
+                            delay(300) // Увеличиваем задержку для лучшего эффекта
+                            isPressed = false
+                        }
+                    }
+                )
+            },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 1.dp
+            defaultElevation = elevation.dp // Применяем анимацию подъема
         )
     ) {
         Row(
@@ -1441,7 +1385,6 @@ fun CompactTaskItem(
         }
     }
 }
-
 @Composable
 fun StatusFilterChips(
     currentStatus: TaskStatus?,
@@ -1566,66 +1509,67 @@ fun FlowRow(
         content = content,
         modifier = modifier
     ) { measurables, constraints ->
-        val sequences = mutableListOf<List<Measurable>>()
-        val crossAxisSizes = mutableListOf<Int>()
-        val crossAxisPositions = mutableListOf<Int>()
+        // Structure to hold information about each row
+        data class RowInfo(
+            val placeables: List<Placeable>,
+            val height: Int
+        )
 
-        var mainAxisSpace = 0
-        var crossAxisSpace = 0
+        val rows = mutableListOf<RowInfo>()
+        val currentRowPlaceables = mutableListOf<Placeable>()
+        var currentRowWidth = 0
+        var currentRowHeight = 0
+        var totalHeight = 0
 
-        val currentSequence = mutableListOf<Measurable>()
-        var currentMainAxisSize = 0
-        var currentCrossAxisSize = 0
-
-        // Разбиваем на строки
-        for (i in measurables.indices) {
-            val measurable = measurables[i]
-
-            // Измеряем элемент
+        // Measure and organize into rows
+        for (measurable in measurables) {
             val placeable = measurable.measure(constraints)
 
-            // Если не помещается в текущую строку - начинаем новую
-            if (currentSequence.isNotEmpty() && currentMainAxisSize + mainAxisSpacing.roundToPx() + placeable.width > constraints.maxWidth) {
-                sequences.add(currentSequence.toList())
-                crossAxisSizes.add(currentCrossAxisSize)
-                crossAxisPositions.add(crossAxisSpace)
+            // Check if adding this item would exceed the max width
+            if (currentRowPlaceables.isNotEmpty() &&
+                currentRowWidth + mainAxisSpacing.roundToPx() + placeable.width > constraints.maxWidth) {
+                // Add the current row and start a new one
+                rows.add(RowInfo(currentRowPlaceables.toList(), currentRowHeight))
+                totalHeight += currentRowHeight
+                if (rows.size > 1) {
+                    totalHeight += crossAxisSpacing.roundToPx()
+                }
 
-                crossAxisSpace += currentCrossAxisSize + crossAxisSpacing.roundToPx()
-
-                currentSequence.clear()
-                currentMainAxisSize = 0
-                currentCrossAxisSize = 0
+                // Reset for next row
+                currentRowPlaceables.clear()
+                currentRowWidth = 0
+                currentRowHeight = 0
             }
 
-            // Добавляем в текущую строку
-            currentSequence.add(measurable)
-            currentMainAxisSize += placeable.width + if (currentSequence.size > 1) mainAxisSpacing.roundToPx() else 0
-            currentCrossAxisSize = maxOf(currentCrossAxisSize, placeable.height)
+            // Add to current row
+            currentRowPlaceables.add(placeable)
+            currentRowWidth += placeable.width +
+                    if (currentRowPlaceables.size > 1) mainAxisSpacing.roundToPx() else 0
+            currentRowHeight = maxOf(currentRowHeight, placeable.height)
         }
 
-        // Добавляем последнюю строку, если она не пуста
-        if (currentSequence.isNotEmpty()) {
-            sequences.add(currentSequence.toList())
-            crossAxisSizes.add(currentCrossAxisSize)
-            crossAxisPositions.add(crossAxisSpace)
-            crossAxisSpace += currentCrossAxisSize
+        // Add the last row if not empty
+        if (currentRowPlaceables.isNotEmpty()) {
+            rows.add(RowInfo(currentRowPlaceables.toList(), currentRowHeight))
+            totalHeight += currentRowHeight
+            if (rows.size > 1) {
+                totalHeight += crossAxisSpacing.roundToPx()
+            }
         }
 
-        val layoutHeight = crossAxisSpace
+        // Layout the children
+        layout(constraints.maxWidth, totalHeight) {
+            var yPosition = 0
 
-        // Размещаем элементы
-        layout(constraints.maxWidth, layoutHeight) {
-            sequences.forEachIndexed { i, seq ->
-                var mainAxisPos = 0
+            rows.forEach { row ->
+                var xPosition = 0
 
-                seq.forEach { measurable ->
-                    val placeable = measurable.measure(constraints)
-                    placeable.place(
-                        x = mainAxisPos,
-                        y = crossAxisPositions[i]
-                    )
-                    mainAxisPos += placeable.width + mainAxisSpacing.roundToPx()
+                row.placeables.forEach { placeable ->
+                    placeable.place(x = xPosition, y = yPosition)
+                    xPosition += placeable.width + mainAxisSpacing.roundToPx()
                 }
+
+                yPosition += row.height + crossAxisSpacing.roundToPx()
             }
         }
     }

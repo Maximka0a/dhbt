@@ -43,18 +43,25 @@ class EditTaskViewModel @Inject constructor(
     val events = _events.asSharedFlow()
 
     init {
+        android.util.Log.d("EditTaskViewModel", "Initializing EditTaskViewModel")
+
+        // Загружаем все категории и теги при инициализации
         viewModelScope.launch {
             loadCategories()
-            loadTags()
         }
-    }
 
-    fun setTaskId(taskId: String) {
-        // Убираем проверку на совпадение с предыдущим значением taskId
-        if (taskId.isNotEmpty()) {
-            _taskId = taskId
-            viewModelScope.launch {
-                loadTaskData(taskId)
+        // Загружаем теги в отдельной корутине
+        viewModelScope.launch {
+            try {
+                // Загружаем все доступные теги
+                android.util.Log.d("EditTaskViewModel", "Loading tags during initialization")
+                tagRepository.getAllTags().collect { tags ->
+                    android.util.Log.d("EditTaskViewModel", "Received ${tags.size} tags from repository")
+                    _tagsState.value = tags
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("EditTaskViewModel", "Failed to load tags: ${e.message}", e)
+                _events.emit(EditTaskEvent.ShowError("Не удалось загрузить теги: ${e.message}"))
             }
         }
     }
@@ -65,14 +72,47 @@ class EditTaskViewModel @Inject constructor(
                 _categoryState.value = categories
             }
     }
+    private fun loadTags() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("EditTaskViewModel", "Starting to load all tags")
 
-    private suspend fun loadTags() {
-        tagRepository.getAllTags()
-            .collect { tags ->
-                _tagsState.value = tags
+                // Однократно загружаем все теги приложения и сохраняем их в _tagsState
+                tagRepository.getAllTags().collect { allTags ->
+                    android.util.Log.d("EditTaskViewModel", "Loaded ${allTags.size} tags from repository")
+                    _tagsState.value = allTags
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("EditTaskViewModel", "Error loading all tags: ${e.message}", e)
+                viewModelScope.launch {
+                    _events.emit(EditTaskEvent.ShowError("Ошибка загрузки тегов: ${e.message}"))
+                }
             }
+        }
     }
+    fun setTaskId(taskId: String) {
+        if (taskId.isNotEmpty()) {
+            _taskId = taskId
 
+            // Загружаем основные данные задачи
+            viewModelScope.launch {
+                loadTaskData(taskId)
+            }
+
+            // Отдельно загружаем выбранные теги для этой задачи
+            viewModelScope.launch {
+                try {
+                    taskRepository.getTagsForTask(taskId).collect { selectedTags ->
+                        android.util.Log.d("EditTaskViewModel", "Loaded ${selectedTags.size} selected tags for task $taskId")
+                        val selectedIds = selectedTags.map { it.id }.toSet()
+                        _uiState.update { it.copy(selectedTagIds = selectedIds) }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("EditTaskViewModel", "Error loading selected tags: ${e.message}", e)
+                }
+            }
+        }
+    }
     private suspend fun loadTaskData(taskId: String) {
         // Добавляем индикатор загрузки
         _uiState.update { it.copy(isLoading = true) }
@@ -287,21 +327,11 @@ class EditTaskViewModel @Inject constructor(
                 val dueDate = currentState.dueDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
                 val dueTime = currentState.dueTime?.let { "${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}" }
 
-                // Create TaskRecurrence if needed
-                val recurrence = if (currentState.recurrenceType != null) {
-                    TaskRecurrence(
-                        id = UUID.randomUUID().toString(),
-                        taskId = _taskId ?: UUID.randomUUID().toString(),
-                        type = currentState.recurrenceType,
-                        daysOfWeek = currentState.daysOfWeek.toList(),
-                        monthDay = currentState.monthDay,
-                        customInterval = currentState.customInterval,
-                        startDate = System.currentTimeMillis()
-                    )
-                } else null
+                // Сначала создаем или обновляем задачу без привязки повторения
+                val taskId = _taskId ?: UUID.randomUUID().toString()
 
                 val task = Task(
-                    id = _taskId ?: UUID.randomUUID().toString(),
+                    id = taskId,
                     title = currentState.title,
                     description = currentState.description.takeIf { it.isNotBlank() },
                     categoryId = currentState.categoryId,
@@ -318,14 +348,42 @@ class EditTaskViewModel @Inject constructor(
                     tags = currentState.selectedTagIds.mapNotNull { tagId ->
                         _tagsState.value.find { it.id == tagId }
                     },
-                    recurrence = recurrence
+                    // Установим повторение в null, мы добавим его позже
+                    recurrence = null
                 )
 
-                // Create or update the task
+                // Сохраняем задачу
                 if (_taskId == null) {
-                    taskRepository.addTask(task)
+                    // Сохраняем новую задачу
+                    val savedTaskId = taskRepository.addTask(task)
+
+                    // Теперь обновляем ID всех подзадач
+                    saveSubtasks(savedTaskId)
+
+                    // Теперь создаем повторение, если оно необходимо
+                    if (currentState.recurrenceType != null) {
+                        saveRecurrence(savedTaskId, currentState)
+                    }
+
+                    // Обновляем связи с тегами
+                    saveTaskTagRelations(savedTaskId, currentState.selectedTagIds)
                 } else {
+                    // Обновляем существующую задачу
                     taskRepository.updateTask(task)
+
+                    // Обновляем подзадачи
+                    saveSubtasks(_taskId!!)
+
+                    // Обновляем повторение
+                    if (currentState.recurrenceType != null) {
+                        saveRecurrence(_taskId!!, currentState)
+                    } else {
+                        // Удаляем предыдущие настройки повторения, если они были
+                        taskRepository.deleteTaskRecurrence(_taskId!!)
+                    }
+
+                    // Обновляем связи с тегами
+                    saveTaskTagRelations(_taskId!!, currentState.selectedTagIds)
                 }
 
                 _events.emit(EditTaskEvent.NavigateBack)
@@ -335,6 +393,51 @@ class EditTaskViewModel @Inject constructor(
         }
     }
 
+    // Вспомогательные методы для сохранения разных аспектов задачи
+    private suspend fun saveSubtasks(taskId: String) {
+        // Удаляем старые подзадачи, если они были
+        taskRepository.deleteSubtasksForTask(taskId)
+
+        // Сохраняем новые подзадачи с правильным taskId
+        _subtasks.value.forEachIndexed { index, subtask ->
+            taskRepository.addSubtask(subtask.copy(
+                taskId = taskId,
+                order = index
+            ))
+        }
+    }
+
+    private suspend fun saveRecurrence(taskId: String, state: EditTaskUiState) {
+        // Удаляем старое повторение, если оно было
+        taskRepository.deleteTaskRecurrence(taskId)
+
+        // Проверяем, что тип повторения не null перед созданием
+        val recurrenceType = state.recurrenceType
+        if (recurrenceType != null) {
+            // Создаем новое повторение только если тип не null
+            val recurrence = TaskRecurrence(
+                id = UUID.randomUUID().toString(),
+                taskId = taskId,
+                type = recurrenceType, // Теперь передаем non-nullable тип
+                daysOfWeek = state.daysOfWeek.toList(),
+                monthDay = state.monthDay,
+                customInterval = state.customInterval,
+                startDate = System.currentTimeMillis()
+            )
+
+            taskRepository.saveTaskRecurrence(recurrence)
+        }
+    }
+
+    private suspend fun saveTaskTagRelations(taskId: String, tagIds: Set<String>) {
+        // Сначала удаляем все старые связи
+        taskRepository.deleteTagsForTask(taskId)
+
+        // Затем добавляем новые связи
+        tagIds.forEach { tagId ->
+            taskRepository.addTagToTask(taskId, tagId)
+        }
+    }
     fun onCancel() {
         viewModelScope.launch {
             _events.emit(EditTaskEvent.NavigateBack)

@@ -19,7 +19,6 @@ data class TaskDetailState(
     val recurrence: TaskRecurrence? = null,
     val totalFocusTime: Int? = null,
     val relatedTasks: List<Task> = emptyList(),
-    val showDeleteDialog: Boolean = false,
     val showEditTask: Boolean = false,
     val showPomodoroDialog: Boolean = false,
     var showDeleteConfirmDialog: Boolean = false
