@@ -14,9 +14,12 @@ import com.example.dhbt.domain.repository.CategoryRepository
 import com.example.dhbt.domain.repository.PomodoroRepository
 import com.example.dhbt.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -35,6 +38,9 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
 
+    private val _events = MutableSharedFlow<SettingsEvent>()
+    val events = _events.asSharedFlow()
+
     // Потоки данных
     val userData: StateFlow<UserData> = userPreferencesRepository.getUserData()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserData())
@@ -47,6 +53,7 @@ class SettingsViewModel @Inject constructor(
 
     val categories: StateFlow<List<Category>> = categoryRepository.getAllCategories()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
 
     // Состояния диалогов
     private val _showDeleteDialog = MutableStateFlow(false)
@@ -136,12 +143,12 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.DismissError -> _errorMessage.value = null
         }
     }
-
     private fun updateTheme(themeMode: Int) {
         viewModelScope.launch {
             try {
                 userPreferencesRepository.updateTheme(themeMode)
                 _successMessage.value = "Тема оформления обновлена"
+                // Theme changes are observed and applied immediately via flow in MainViewModel
             } catch (e: Exception) {
                 _errorMessage.value = "Не удалось обновить тему: ${e.message}"
                 Log.e("SettingsVM", "Ошибка обновления темы", e)
@@ -152,8 +159,16 @@ class SettingsViewModel @Inject constructor(
     private fun updateLanguage(language: String) {
         viewModelScope.launch {
             try {
+                // First update the repository
                 userPreferencesRepository.updateLanguage(language)
-                _successMessage.value = "Язык обновлен. Изменения вступят в силу при перезапуске."
+
+                // Then emit event (with a slight delay to prevent race conditions)
+                delay(50)
+                _events.emit(SettingsEvent.LanguageChanged(language))
+
+                // Only show success message after language actually changes
+                delay(200)
+                _successMessage.value = "Язык обновлен и применен"
             } catch (e: Exception) {
                 _errorMessage.value = "Не удалось обновить язык: ${e.message}"
                 Log.e("SettingsVM", "Ошибка обновления языка", e)
@@ -166,6 +181,9 @@ class SettingsViewModel @Inject constructor(
             try {
                 userPreferencesRepository.updateStartScreen(screenType)
                 _successMessage.value = "Стартовый экран обновлен"
+
+                // Send event to notify that start screen was updated
+                _events.emit(SettingsEvent.StartScreenChanged(screenType))
             } catch (e: Exception) {
                 _errorMessage.value = "Не удалось обновить стартовый экран: ${e.message}"
             }
@@ -415,6 +433,13 @@ data class LanguageOption(
     val code: String,
     val displayName: String
 )
+
+sealed class SettingsEvent {
+    data class LanguageChanged(val language: String) : SettingsEvent()
+    data class StartScreenChanged(val screenType: Int) : SettingsEvent()
+    data class ThemeChanged(val theme: AppTheme) : SettingsEvent()
+    object SettingsResetComplete : SettingsEvent()
+}
 
 sealed class SettingsAction {
     data class UpdateTheme(val themeMode: Int) : SettingsAction()

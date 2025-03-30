@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,13 @@ fun PomodoroScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+
+    LaunchedEffect(taskId) {
+        if (taskId.isNotEmpty()) {
+            viewModel.loadTaskById(taskId)
+        }
+    }
 
     // Диалоги
     var showSettingsDialog by remember { mutableStateOf(false) }

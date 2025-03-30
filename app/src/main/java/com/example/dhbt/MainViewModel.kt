@@ -1,12 +1,15 @@
 package com.example.dhbt.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.example.dhbt.domain.model.AppTheme
+import com.example.dhbt.domain.model.StartScreen
 import com.example.dhbt.domain.model.UserPreferences
 import com.example.dhbt.domain.repository.UserPreferencesRepository
 import com.example.dhbt.presentation.base.BaseViewModel
 import com.example.dhbt.presentation.base.UiEvent
 import com.example.dhbt.presentation.base.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -19,11 +22,44 @@ class MainViewModel @Inject constructor(
     override fun createInitialState(): MainState = MainState(
         isLoading = true,
         hasCompletedOnboarding = false,
-        userName = ""
+        userName = "",
+        language = "ru",
+        theme = AppTheme.SYSTEM,
+        startScreen = StartScreen.DASHBOARD
     )
 
     init {
         checkInitialState()
+        observeSettingsChanges()
+    }
+
+    private fun observeSettingsChanges() {
+        viewModelScope.launch {
+            userPreferencesRepository.getUserPreferences().collectLatest { preferences ->
+                setState {
+                    copy(
+                        theme = preferences.theme,
+                        language = preferences.language,
+                        startScreen = preferences.startScreenType
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            userPreferencesRepository.getUserData().collectLatest { userData ->
+                setState {
+                    copy(
+                        userName = userData.name,
+                        userEmail = userData.email,
+                        avatarUrl = userData.avatarUrl,
+                        wakeUpTime = userData.wakeUpTime,
+                        sleepTime = userData.sleepTime,
+                        isPremium = userData.isPremium
+                    )
+                }
+            }
+        }
     }
 
     fun checkInitialState() {
@@ -44,9 +80,14 @@ class MainViewModel @Inject constructor(
                         wakeUpTime = userData.wakeUpTime,
                         sleepTime = userData.sleepTime,
                         theme = preferences.theme,
+                        language = preferences.language,
+                        startScreen = preferences.startScreenType,
                         isPremium = userData.isPremium
                     )
                 }
+
+                // Send event to update language immediately if needed
+                sendEvent(MainEvent.ApplyLanguage(preferences.language))
             } catch (e: Exception) {
                 setState { copy(isLoading = false, error = e.message) }
                 sendEvent(MainEvent.ShowError(e.message ?: "Произошла ошибка при загрузке данных"))
@@ -99,7 +140,9 @@ class MainViewModel @Inject constructor(
         val avatarUrl: String? = null,
         val wakeUpTime: String? = null,
         val sleepTime: String? = null,
-        val theme: com.example.dhbt.domain.model.AppTheme = com.example.dhbt.domain.model.AppTheme.SYSTEM,
+        val theme: AppTheme = AppTheme.SYSTEM,
+        val language: String = "ru",
+        val startScreen: StartScreen = StartScreen.DASHBOARD,
         val isPremium: Boolean = false,
         val error: String? = null
     ) : UiState
@@ -107,5 +150,7 @@ class MainViewModel @Inject constructor(
     sealed class MainEvent : UiEvent {
         data class ShowError(val message: String) : MainEvent()
         data class NavigateToScreen(val screen: String) : MainEvent()
+        data class ApplyLanguage(val language: String) : MainEvent()
+        object RefreshApp : MainEvent()
     }
 }

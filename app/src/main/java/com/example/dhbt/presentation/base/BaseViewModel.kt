@@ -26,7 +26,7 @@ abstract class BaseViewModel<S : UiState, E : UiEvent> : ViewModel() {
         _state.value = newState
     }
 
-    protected fun sendEvent(event: E) {
+    fun sendEvent(event: E) {
         viewModelScope.launch {
             _event.send(event)
         }

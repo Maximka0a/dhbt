@@ -7,6 +7,7 @@ import com.example.dhbt.domain.model.*
 import com.example.dhbt.domain.repository.CategoryRepository
 import com.example.dhbt.domain.repository.HabitRepository
 import com.example.dhbt.domain.repository.TagRepository
+import com.example.dhbt.presentation.components.SnackbarType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
 import javax.inject.Inject
@@ -27,71 +29,75 @@ class HabitDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val habitId: String? = savedStateHandle["habitId"]
-    val isCreationMode = habitId == null
+    private val initialDate: String? = savedStateHandle["date"]
 
-    // Состояние UI
+    // Selected date (default to today if not provided)
+    private val _selectedDate = MutableStateFlow(
+        initialDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+    )
+    val selectedDate = _selectedDate.asStateFlow()
+
+    // UI state
     private val _uiState = MutableStateFlow(HabitDetailUiState())
     val uiState = _uiState.asStateFlow()
 
-    // Данные привычки
+    // Habit data
     private val _habit = MutableStateFlow<Habit?>(null)
     val habit = _habit.asStateFlow()
 
-    // Категория
+    // Category
     private val _category = MutableStateFlow<Category?>(null)
     val category = _category.asStateFlow()
 
-    // Теги
+    // Tags
     private val _tags = MutableStateFlow<List<Tag>>(emptyList())
     val tags = _tags.asStateFlow()
 
-    // История отслеживания
+    // Tracking history
     private val _trackingHistory = MutableStateFlow<List<HabitTracking>>(emptyList())
     val trackingHistory = _trackingHistory.asStateFlow()
 
-    // Данные для календаря активности
+    // Calendar data
     private val _calendarData = MutableStateFlow<Map<LocalDate, Float>>(emptyMap())
     val calendarData = _calendarData.asStateFlow()
 
-    // Данные для графиков
+    // Chart data
     private val _weeklyCompletion = MutableStateFlow<List<Float>>(List(7) { 0f })
     val weeklyCompletion = _weeklyCompletion.asStateFlow()
 
     private val _monthlyCompletion = MutableStateFlow<List<Float>>(List(30) { 0f })
     val monthlyCompletion = _monthlyCompletion.asStateFlow()
 
-    // Данные о прогрессе сегодняшнего дня
-    private val _todayProgress = MutableStateFlow(0f)
-    val todayProgress = _todayProgress.asStateFlow()
+    // Current day progress data
+    private val _currentProgress = MutableStateFlow(0f)
+    val currentProgress = _currentProgress.asStateFlow()
 
-    private val _todayValue = MutableStateFlow(0f)
-    val todayValue = _todayValue.asStateFlow()
+    private val _currentValue = MutableStateFlow(0f)
+    val currentValue = _currentValue.asStateFlow()
 
-    private val _todayIsCompleted = MutableStateFlow(false)
-    val todayIsCompleted = _todayIsCompleted.asStateFlow()
+    private val _isCompleted = MutableStateFlow(false)
+    val isCompleted = _isCompleted.asStateFlow()
 
-    // Одноразовые события
+    // One-time events
     private val _events = MutableSharedFlow<HabitDetailEvent>()
     val events = _events.asSharedFlow()
 
-    // Текущая выбранная секция для графика
+    // Selected chart period
     private val _selectedChartPeriod = MutableStateFlow(ChartPeriod.WEEK)
     val selectedChartPeriod = _selectedChartPeriod.asStateFlow()
 
-    // Для отображения диалога удаления
+    // Delete dialog visibility
     private val _showDeleteDialog = MutableStateFlow(false)
     val showDeleteDialog = _showDeleteDialog.asStateFlow()
 
-    // Для отображения меню
-    private val _showMenu = MutableStateFlow(false)
-    val showMenu = _showMenu.asStateFlow()
+    // Date picker dialog visibility
+    private val _showDatePicker = MutableStateFlow(false)
+    val showDatePicker = _showDatePicker.asStateFlow()
 
     init {
         loadHabit()
         loadTrackingData()
-        calculateCalendarData()
-        calculateChartData()
-        updateTodayProgress()
+        updateProgressForDate(_selectedDate.value)
     }
 
     fun onAction(action: HabitDetailAction) {
@@ -104,22 +110,44 @@ class HabitDetailViewModel @Inject constructor(
             is HabitDetailAction.DeleteHabit -> deleteHabit()
             is HabitDetailAction.SetChartPeriod -> setChartPeriod(action.period)
             is HabitDetailAction.ShowDeleteDialog -> _showDeleteDialog.value = action.show
-            is HabitDetailAction.ShowMenu -> _showMenu.value = action.show
+            is HabitDetailAction.ShowDatePicker -> _showDatePicker.value = action.show
+            is HabitDetailAction.SelectDate -> selectDate(action.date)
         }
     }
 
+    /**
+     * Method to reload data after habit editing
+     */
+    fun reloadHabitData() {
+        loadHabit()
+        loadTrackingData()
+        updateProgressForDate(_selectedDate.value)
+    }
+
+    /**
+     * Method to select a specific date
+     */
+    private fun selectDate(date: LocalDate) {
+        _selectedDate.value = date
+        updateProgressForDate(date)
+        _showDatePicker.value = false
+    }
+
+    /**
+     * Loads habit data
+     */
     private fun loadHabit() {
         viewModelScope.launch {
             try {
                 val habit = habitRepository.getHabitById(habitId.toString())
                 _habit.value = habit
 
-                // Загружаем связанную категорию, если она есть
+                // Load related category if exists
                 habit?.categoryId?.let { categoryId ->
                     _category.value = categoryRepository.getCategoryById(categoryId)
                 }
 
-                // Загружаем связанные теги (предполагая, что API такой же для привычек)
+                // Load related tags
                 _tags.value = tagRepository.getTagsForTask(habitId.toString()).first()
 
                 _uiState.update { it.copy(isLoading = false) }
@@ -134,6 +162,9 @@ class HabitDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Loads tracking data for the last 30 days
+     */
     private fun loadTrackingData() {
         viewModelScope.launch {
             val now = LocalDate.now()
@@ -147,11 +178,60 @@ class HabitDetailViewModel @Inject constructor(
                     _trackingHistory.value = trackings
                     calculateCalendarData()
                     calculateChartData()
-                    updateTodayProgress()
                 }
         }
     }
 
+    /**
+     * Updates progress for the selected date
+     */
+    private fun updateProgressForDate(date: LocalDate) {
+        val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        viewModelScope.launch {
+            try {
+                val tracking = habitRepository.getHabitTrackingForDate(habitId.toString(), startOfDay)
+                val habit = _habit.value ?: return@launch
+
+                if (tracking == null) {
+                    _currentProgress.value = 0f
+                    _currentValue.value = 0f
+                    _isCompleted.value = false
+                    return@launch
+                }
+
+                _isCompleted.value = tracking.isCompleted
+
+                when (habit.type) {
+                    HabitType.BINARY -> {
+                        _currentProgress.value = if (tracking.isCompleted) 1f else 0f
+                        _currentValue.value = if (tracking.isCompleted) 1f else 0f
+                    }
+                    HabitType.QUANTITY -> {
+                        val value = tracking.value ?: 0f
+                        val target = habit.targetValue ?: 1f
+                        _currentValue.value = value
+                        _currentProgress.value = value / target
+                    }
+                    HabitType.TIME -> {
+                        val duration = tracking.duration?.toFloat() ?: 0f
+                        val target = habit.targetValue ?: 1f
+                        _currentValue.value = duration
+                        _currentProgress.value = duration / target
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(error = "Не удалось загрузить данные за выбранную дату")
+                }
+                _events.emit(HabitDetailEvent.Error("Не удалось загрузить данные за выбранную дату"))
+            }
+        }
+    }
+
+    /**
+     * Calculates calendar heatmap data
+     */
     private fun calculateCalendarData() {
         val trackings = _trackingHistory.value
         if (trackings.isEmpty()) return
@@ -160,13 +240,16 @@ class HabitDetailViewModel @Inject constructor(
 
         trackings.forEach { tracking ->
             val date = LocalDate.ofEpochDay(tracking.date / 86400000) // Convert milliseconds to days
-            val progress = if (tracking.isCompleted) 1f else 0f
+            val progress = calculateCompletionRateForTracking(tracking)
             dateMap[date] = progress
         }
 
         _calendarData.value = dateMap
     }
 
+    /**
+     * Calculates chart data (weekly and monthly)
+     */
     private fun calculateChartData() {
         val trackings = _trackingHistory.value
         if (trackings.isEmpty()) return
@@ -193,6 +276,9 @@ class HabitDetailViewModel @Inject constructor(
         _monthlyCompletion.value = monthlyData
     }
 
+    /**
+     * Finds tracking data for a specific date
+     */
     private fun findTrackingForDate(date: LocalDate): HabitTracking? {
         val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
@@ -202,6 +288,9 @@ class HabitDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Calculates completion rate for a tracking entry
+     */
     private fun calculateCompletionRateForTracking(tracking: HabitTracking?): Float {
         if (tracking == null) return 0f
         if (!tracking.isCompleted) return 0f
@@ -213,103 +302,72 @@ class HabitDetailViewModel @Inject constructor(
             HabitType.QUANTITY -> {
                 val value = tracking.value ?: 0f
                 val target = habit.targetValue ?: 1f
-                // Remove coerceIn to allow values > 1.0
                 value / target
             }
             HabitType.TIME -> {
                 val duration = tracking.duration?.toFloat() ?: 0f
                 val target = habit.targetValue ?: 1f
-                // Remove coerceIn to allow values > 1.0
                 duration / target
             }
         }
     }
 
-    private fun updateTodayProgress() {
-        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-        viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
-            val habit = _habit.value ?: return@launch
-
-            if (todayTracking == null) {
-                _todayProgress.value = 0f
-                _todayValue.value = 0f
-                _todayIsCompleted.value = false
-                return@launch
-            }
-
-            _todayIsCompleted.value = todayTracking.isCompleted
-
-            when (habit.type) {
-                HabitType.BINARY -> {
-                    _todayProgress.value = if (todayTracking.isCompleted) 1f else 0f
-                    _todayValue.value = if (todayTracking.isCompleted) 1f else 0f
-                }
-                HabitType.QUANTITY -> {
-                    val value = todayTracking.value ?: 0f
-                    val target = habit.targetValue ?: 1f
-                    _todayValue.value = value
-                    // Remove the coerceIn to allow progress > 1.0
-                    _todayProgress.value = value / target
-                }
-                HabitType.TIME -> {
-                    val duration = todayTracking.duration?.toFloat() ?: 0f
-                    val target = habit.targetValue ?: 1f
-                    _todayValue.value = duration
-                    // Remove the coerceIn to allow progress > 1.0
-                    _todayProgress.value = duration / target
-                }
-            }
-        }
-    }
-
+    /**
+     * Increments progress for the selected date
+     */
     private fun incrementProgress() {
         viewModelScope.launch {
-            val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            habitRepository.incrementHabitProgress(habitId.toString(), today)
-            updateTodayProgress()
-            loadTrackingData()
-            _events.emit(HabitDetailEvent.ProgressUpdated("Прогресс увеличен"))
+            val date = _selectedDate.value
+            val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+            habitRepository.incrementHabitProgress(habitId.toString(), startOfDay)
+            updateProgressForDate(date)
+            loadTrackingData() // Reload to update charts
+
+            _events.emit(HabitDetailEvent.ProgressUpdated(
+                message = "Прогресс увеличен",
+                type = SnackbarType.SUCCESS
+            ))
         }
     }
 
+    /**
+     * Decrements progress for the selected date
+     */
     private fun decrementProgress() {
         val habit = _habit.value ?: return
-        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val date = _selectedDate.value
+        val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
+            val tracking = habitRepository.getHabitTrackingForDate(habitId.toString(), startOfDay)
 
-            if (todayTracking == null) return@launch
+            if (tracking == null) return@launch
 
             when (habit.type) {
                 HabitType.BINARY -> {
-                    // Для бинарного типа просто отмечаем как не выполненное
-                    val updatedTracking = todayTracking.copy(isCompleted = false)
+                    val updatedTracking = tracking.copy(isCompleted = false)
                     habitRepository.updateHabitTracking(updatedTracking)
                 }
                 HabitType.QUANTITY -> {
-                    // Для количественного типа уменьшаем значение на 1
-                    val currentValue = todayTracking.value ?: 0f
+                    val currentValue = tracking.value ?: 0f
                     val newValue = (currentValue - 1).coerceAtLeast(0f)
                     val targetValue = habit.targetValue ?: 1f
                     val isCompleted = newValue >= targetValue
 
-                    val updatedTracking = todayTracking.copy(
+                    val updatedTracking = tracking.copy(
                         value = newValue,
                         isCompleted = isCompleted
                     )
                     habitRepository.updateHabitTracking(updatedTracking)
                 }
                 HabitType.TIME -> {
-                    // Для времени уменьшаем на 1 минуту (или другую логику)
-                    val currentDuration = todayTracking.duration ?: 0
+                    val currentDuration = tracking.duration ?: 0
                     val newDuration = (currentDuration - 1).coerceAtLeast(0)
                     val targetDuration = habit.targetValue?.toInt() ?: 1
                     val isCompleted = newDuration >= targetDuration
 
-                    val updatedTracking = todayTracking.copy(
+                    val updatedTracking = tracking.copy(
                         duration = newDuration,
                         isCompleted = isCompleted
                     )
@@ -317,39 +375,52 @@ class HabitDetailViewModel @Inject constructor(
                 }
             }
 
-            updateTodayProgress()
+            updateProgressForDate(date)
             loadTrackingData()
-            _events.emit(HabitDetailEvent.ProgressUpdated("Прогресс уменьшен"))
+
+            _events.emit(HabitDetailEvent.ProgressUpdated(
+                message = "Прогресс уменьшен",
+                type = SnackbarType.INFO
+            ))
         }
     }
 
+    /**
+     * Toggles completion status for the selected date
+     */
     private fun toggleCompletion() {
-        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val date = _selectedDate.value
+        val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         viewModelScope.launch {
-            val todayTracking = habitRepository.getHabitTrackingForDate(habitId.toString(), today)
+            val tracking = habitRepository.getHabitTrackingForDate(habitId.toString(), startOfDay)
 
-            if (todayTracking != null) {
-                // Переключаем существующую запись
-                val updatedTracking = todayTracking.copy(isCompleted = !todayTracking.isCompleted)
+            if (tracking != null) {
+                val updatedTracking = tracking.copy(isCompleted = !tracking.isCompleted)
                 habitRepository.updateHabitTracking(updatedTracking)
             } else {
-                // Создаем новую запись
                 val newTracking = HabitTracking(
                     id = UUID.randomUUID().toString(),
                     habitId = habitId.toString(),
-                    date = today,
+                    date = startOfDay,
                     isCompleted = true
                 )
                 habitRepository.trackHabit(newTracking)
             }
 
-            updateTodayProgress()
+            updateProgressForDate(date)
             loadTrackingData()
-            _events.emit(HabitDetailEvent.ProgressUpdated("Статус выполнения обновлен"))
+
+            _events.emit(HabitDetailEvent.ProgressUpdated(
+                message = "Статус выполнения обновлен",
+                type = SnackbarType.SUCCESS
+            ))
         }
     }
 
+    /**
+     * Archives or unarchives the habit
+     */
     private fun archiveHabit() {
         viewModelScope.launch {
             val habit = _habit.value ?: return@launch
@@ -371,10 +442,16 @@ class HabitDetailViewModel @Inject constructor(
                 "Привычка восстановлена из архива"
             }
 
-            _events.emit(HabitDetailEvent.HabitStatusChanged(message))
+            _events.emit(HabitDetailEvent.HabitStatusChanged(
+                message = message,
+                type = SnackbarType.INFO
+            ))
         }
     }
 
+    /**
+     * Prepares share text for the habit
+     */
     private fun shareHabit() {
         val habit = _habit.value ?: return
 
@@ -390,26 +467,36 @@ class HabitDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Deletes the habit
+     */
     private fun deleteHabit() {
         viewModelScope.launch {
             try {
                 habitRepository.deleteHabit(habitId.toString())
                 _events.emit(HabitDetailEvent.HabitDeleted)
             } catch (e: Exception) {
-                _events.emit(HabitDetailEvent.Error("Не удалось удалить привычку: ${e.localizedMessage}"))
+                _events.emit(HabitDetailEvent.Error(
+                    message = "Не удалось удалить привычку",
+                    type = SnackbarType.ERROR
+                ))
             }
         }
     }
 
+    /**
+     * Sets the chart period (week/month)
+     */
     private fun setChartPeriod(period: ChartPeriod) {
         _selectedChartPeriod.value = period
     }
 
-    // Получение форматированной строки для отображения частоты
+    /**
+     * Returns formatted frequency text
+     */
     fun getFrequencyText(): String {
         val habit = _habit.value ?: return "Ежедневно"
 
-        // Получаем частоту из репозитория, т.к. она больше не хранится в Habit
         val frequency = runBlocking { habitRepository.getHabitFrequency(habit.id) } ?: return "Ежедневно"
 
         return when (frequency.type) {
@@ -424,7 +511,7 @@ class HabitDetailViewModel @Inject constructor(
                         "$dayNumber"
                     }
                 }
-                "По дням: ${days.joinToString<Int>(", ")}"
+                "По дням: ${dayNames.joinToString(", ")}"
             }
             FrequencyType.TIMES_PER_WEEK -> {
                 val times = frequency.timesPerPeriod ?: 1
@@ -434,16 +521,18 @@ class HabitDetailViewModel @Inject constructor(
                 val times = frequency.timesPerPeriod ?: 1
                 "$times раз в месяц"
             }
-            else -> "Ежедневно" // добавляем ветку else для исчерпывающего when
+            else -> "Ежедневно"
         }
     }
 
-    // Получение информации о целевом значении
+    /**
+     * Returns formatted target value text
+     */
     fun getTargetValueText(): String {
         val habit = _habit.value ?: return "Выполнить"
 
         return when (habit.type) {
-            HabitType.BINARY -> "Отметить выполнение"
+            HabitType.BINARY -> "Отметить"
             HabitType.QUANTITY -> {
                 val target = habit.targetValue ?: 1f
                 val unit = habit.unitOfMeasurement ?: "раз"
@@ -451,49 +540,77 @@ class HabitDetailViewModel @Inject constructor(
             }
             HabitType.TIME -> {
                 val target = habit.targetValue?.toInt() ?: 1
-                "$target минут"
+                "$target мин"
             }
         }
     }
 
-    // Получение текущего прогресса в текстовом виде
+    /**
+     * Returns formatted current progress text
+     */
     fun getCurrentProgressText(): String {
         val habit = _habit.value ?: return "0%"
-        val todayValue = _todayValue.value
+        val value = _currentValue.value
 
         return when (habit.type) {
-            HabitType.BINARY -> if (_todayIsCompleted.value) "Выполнено" else "Не выполнено"
+            HabitType.BINARY -> if (_isCompleted.value) "Выполнено" else "Не выполнено"
             HabitType.QUANTITY -> {
                 val target = habit.targetValue ?: 1f
                 val unit = habit.unitOfMeasurement ?: "раз"
-                // Here we show the actual value, not capped at the target
-                "$todayValue / $target $unit"
+                "$value/$target $unit"
             }
             HabitType.TIME -> {
                 val target = habit.targetValue?.toInt() ?: 1
-                // Here we show the actual value, not capped at the target
-                "$todayValue / $target минут"
+                "$value/$target мин"
             }
         }
     }
+
+    /**
+     * Returns formatted selected date text
+     */
+    fun getSelectedDateText(): String {
+        val formatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+        return _selectedDate.value.format(formatter)
+    }
+
+    /**
+     * Checks if selected date is today
+     */
+    fun isSelectedDateToday(): Boolean {
+        return _selectedDate.value == LocalDate.now()
+    }
 }
 
-// UI состояние для экрана деталей привычки
+// UI state
 data class HabitDetailUiState(
     val isLoading: Boolean = true,
     val error: String? = null
 )
 
-// События для одноразовых действий
+// Events
 sealed class HabitDetailEvent {
-    data class ProgressUpdated(val message: String) : HabitDetailEvent()
-    data class HabitStatusChanged(val message: String) : HabitDetailEvent()
+    data class ProgressUpdated(
+        val message: String,
+        val type: SnackbarType = SnackbarType.SUCCESS
+    ) : HabitDetailEvent()
+
+    data class HabitStatusChanged(
+        val message: String,
+        val type: SnackbarType = SnackbarType.INFO
+    ) : HabitDetailEvent()
+
     data class ShareHabit(val text: String) : HabitDetailEvent()
-    data class Error(val message: String) : HabitDetailEvent()
+
+    data class Error(
+        val message: String,
+        val type: SnackbarType = SnackbarType.ERROR
+    ) : HabitDetailEvent()
+
     object HabitDeleted : HabitDetailEvent()
 }
 
-// Действия, которые пользователь может выполнять
+// Actions
 sealed class HabitDetailAction {
     object IncrementProgress : HabitDetailAction()
     object DecrementProgress : HabitDetailAction()
@@ -503,10 +620,11 @@ sealed class HabitDetailAction {
     object DeleteHabit : HabitDetailAction()
     data class SetChartPeriod(val period: ChartPeriod) : HabitDetailAction()
     data class ShowDeleteDialog(val show: Boolean) : HabitDetailAction()
-    data class ShowMenu(val show: Boolean) : HabitDetailAction()
+    data class ShowDatePicker(val show: Boolean) : HabitDetailAction()
+    data class SelectDate(val date: LocalDate) : HabitDetailAction()
 }
 
-// Периоды для графиков
+// Chart periods
 enum class ChartPeriod {
     WEEK, MONTH
 }

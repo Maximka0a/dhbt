@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">DHbt</string>
+
+    <!-- Bottom Navigation -->
+    <string name="dashboard">Dashboard</string>
+    <string name="tasks">Tasks</string>
+    <string name="habits">Habits</string>
+    <string name="statistics">Statistics</string>
+    <string name="more">More</string>
+
+    <!-- Dashboard Screen -->
+    <string name="habits_for_today">Habits for today</string>
+    <string name="tasks_for_today">Tasks for today</string>
+    <string name="see_all">See all</string>
+    <string name="no_tasks_for_today">No tasks for today</string>
+    <string name="no_habits_for_today">No habits for today</string>
+    <string name="empty_dashboard_title">Start your day</string>
+    <string name="empty_dashboard_subtitle">Add tasks and habits to start tracking your progress</string>
+    <string name="empty_dashboard_message">Add tasks and habits to start tracking your progress</string>
+
+    <!-- Common UI Elements -->
+    <string name="add">Add</string>
+    <string name="close">Close</string>
+    <string name="loading_data">Loading data…</string>
+    <string name="loading">Loading...</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="ok">OK</string>
+    <string name="confirm">Confirm</string>
+    <string name="delete">Delete</string>
+    <string name="archive">Archive</string>
+    <string name="done">Done</string>
+    <string name="search">Search</string>
+    <string name="sort">Sort</string>
+    <string name="filter">Filter</string>
+    <string name="reset_filters">Reset filters</string>
+    <string name="edit">Edit</string>
+    <string name="clear">Clear</string>
+    <string name="create">Create</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="navigate_back">Back</string>
+    <string name="go_back">Go back</string>
+    <string name="retry">Retry</string>
+    <string name="error">Error</string>
+    <string name="share">Share</string>
+    <string name="filters">Filters</string>
+    <string name="clear_all">Clear all</string>
+    <string name="all">All</string>
+    <string name="none">None</string>
+    <string name="details">Details</string>
+    <string name="more_actions">More actions</string>
+    <string name="close_search">Close search</string>
+    <string name="all_categories">All categories</string>
+    <string name="information">Information</string>
+
+    <!-- Error and Messages -->
+    <string name="error_occurred">An error occurred</string>
+    <string name="try_again">Try again</string>
+    <string name="error_title">Something went wrong</string>
+    <string name="return_back">Return back</string>
+
+    <!-- Tasks Screen -->
+    <string name="no_tasks">No tasks</string>
+    <string name="add_task">Add task</string>
+    <string name="task_completed">Task completed!</string>
+    <string name="task_deleted">Task deleted</string>
+    <string name="eisenhower_matrix">Eisenhower Matrix</string>
+    <string name="filter_by_category">Filter by categories</string>
+    <string name="sort_tasks">Sort</string>
+    <string name="no_tasks_found">No tasks found</string>
+    <string name="search_tasks">Search tasks...</string>
+    <string name="overdue">Overdue</string>
+    <string name="repeat">Repeat</string>
+    <string name="warning">Warning: recurring tasks can only be deleted all at once</string>
+    <string name="no_search_results">No results for \"%1$s\"</string>
+    <string name="no_date">No date</string>
+
+    <!-- Task Statuses -->
+    <string name="mark_complete">Mark as complete</string>
+    <string name="mark_incomplete">Mark as incomplete</string>
+    <string name="mark_as_complete">Mark as complete</string>
+    <string name="mark_as_incomplete">Mark as incomplete</string>
+    <string name="active">Active</string>
+    <string name="completed">Completed</string>
+    <string name="archived">Archived</string>
+    <string name="in_progress">In progress</string>
+    <string name="paused">Paused</string>
+    <string name="change_status">Change status</string>
+    <string name="completed_desc">Task is fully completed</string>
+    <string name="active_desc">Task is waiting to be done</string>
+    <string name="in_progress_desc">Task is currently being worked on</string>
+    <string name="paused_desc">Task is temporarily paused</string>
+    <string name="completed_at">Completed</string>
+
+    <!-- Task Details -->
+    <string name="task_details">Task details</string>
+    <string name="edit_task">Edit</string>
+    <string name="delete_task">Delete</string>
+    <string name="complete_task">Complete</string>
+    <string name="subtasks">Subtasks</string>
+    <string name="due_date">Due date</string>
+    <string name="due_time">Due time</string>
+    <string name="due_date_time">Due date and time</string>
+    <string name="priority">Priority</string>
+    <string name="category">Category</string>
+    <string name="description">Description</string>
+    <string name="notes">Notes</string>
+    <string name="tags">Tags</string>
+    <string name="parameters">Parameters</string>
+    <string name="completion_date">Completion date</string>
+    <string name="more_options">More options</string>
+    <string name="confirm_delete_task">Delete task?</string>
+    <string name="additional_info">Additional information</string>
+    <string name="start_pomodoro">Start Pomodoro</string>
+    <string name="loading_task">Loading task…</string>
+    <string name="task_not_found">Task not found</string>
+    <string name="subtasks_completion_count">Completed %1$d of %2$d</string>
+    <string name="duration">Duration</string>
+    <string name="pomodoro_count">%d pomodoros</string>
+    <string name="start_pomodoro_session">Start Pomodoro</string>
+    <string name="task_progress">Task progress</string>
+    <string name="focus_time_progress">Focus time</string>
+    <string name="no_estimated_time_sessions">Task has no time estimate or session count</string>
+
+    <!-- Task Edit -->
+    <string name="create_task">Create task</string>
+    <string name="update_task">Update task</string>
+    <string name="task_title">Task title</string>
+    <string name="task_title_hint">Enter task title</string>
+    <string name="task_description_hint">Enter description (optional)</string>
+    <string name="add_subtask">Add subtask</string>
+    <string name="select_date">Select date</string>
+    <string name="select_time">Select time</string>
+    <string name="select_category">Select category</string>
+    <string name="select_tags">Select tags</string>
+    <string name="set_reminder">Set reminder</string>
+    <string name="delete_subtask">Delete subtask</string>
+    <string name="enter_task_title">Enter task title</string>
+    <string name="title_required">Task title is required</string>
+    <string name="title">Title</string>
+    <string name="enter_task_description">Add detailed task description (optional)</string>
+    <string name="date_and_time">Date and time</string>
+    <string name="save_task">Save task</string>
+    <string name="additional_settings">Additional settings</string>
+    <string name="additional_parameters">Additional</string>
+    <string name="duration_minutes">Duration (minutes)</string>
+    <string name="estimated_pomodoros">Estimated time in "pomodoros"</string>
+    <string name="pomodoro_explanation">One "pomodoro" = 25 minutes of focused work</string>
+
+    <!-- Task Sorting -->
+    <string name="sort_by">Sort by</string>
+    <string name="due_date_asc">Date (↑)</string>
+    <string name="due_date_desc">Date (↓)</string>
+    <string name="priority_high_to_low">Priority (high → low)</string>
+    <string name="priority_low_to_high">Priority (low → high)</string>
+    <string name="alphabetical">Alphabetical</string>
+    <string name="creation_date">Creation date</string>
+    <string name="status">Status</string>
+
+    <!-- Priority Levels -->
+    <string name="low_priority">Low</string>
+    <string name="medium_priority">Medium</string>
+    <string name="high_priority">High</string>
+    <string name="high">High</string>
+    <string name="medium">Medium</string>
+    <string name="low">Low</string>
+    <string name="priority_high">High</string>
+    <string name="priority_medium">Medium</string>
+    <string name="priority_low">Low</string>
+    <string name="no_due_date">No due date</string>
+
+    <!-- Eisenhower Matrix -->
+    <string name="important_urgent">Important and urgent</string>
+    <string name="important_not_urgent">Important but not urgent</string>
+    <string name="not_important_urgent">Not important but urgent</string>
+    <string name="not_important_not_urgent">Not important and not urgent</string>
+    <string name="unassigned_tasks">Unassigned tasks</string>
+    <string name="select_quadrant">Select quadrant</string>
+    <string name="no_quadrant">Don\'t classify</string>
+    <string name="quadrant1">Important and urgent</string>
+    <string name="quadrant2">Important, not urgent</string>
+    <string name="quadrant3">Not important, but urgent</string>
+    <string name="quadrant4">Not important, not urgent</string>
+    <string name="quadrant1_title">Important and urgent</string>
+    <string name="quadrant1_action">Do now</string>
+    <string name="quadrant2_title">Important, not urgent</string>
+    <string name="quadrant2_action">Schedule</string>
+    <string name="quadrant3_title">Not important, but urgent</string>
+    <string name="quadrant3_action">Delegate</string>
+    <string name="quadrant4_title">Not important, not urgent</string>
+    <string name="quadrant4_action">Eliminate</string>
+    <string name="do_first">Do first</string>
+    <string name="schedule">Schedule</string>
+    <string name="delegate">Delegate</string>
+    <string name="eliminate">Eliminate</string>
+    <string name="urgent_important">Urgent and important</string>
+    <string name="not_urgent_important">Not urgent, but important</string>
+    <string name="urgent_not_important">Urgent, but not important</string>
+    <string name="not_urgent_not_important">Not urgent and not important</string>
+
+    <!-- Categories -->
+    <string name="no_category">No category</string>
+    <string name="new_category">New category</string>
+    <string name="category_name">Category name</string>
+    <string name="add_new">Add new</string>
+    <string name="no_categories">You don\'t have any categories yet</string>
+    <string name="create_category">Create category</string>
+    <string name="enter_category_name">Enter category name</string>
+    <string name="select_icon">Select icon</string>
+    <string name="uncategorized">Uncategorized</string>
+
+    <!-- Tags -->
+    <string name="no_tags">No tags</string>
+    <string name="new_tag">New tag</string>
+    <string name="tag_name">Tag name</string>
+    <string name="add_tag">Add tag</string>
+    <string name="create_tag">Create tag</string>
+    <string name="enter_tag_name">Enter tag name</string>
+    <string name="tag_color">Tag color</string>
+
+    <!-- Colors -->
+    <string name="color">Color</string>
+    <string name="no_color">No color</string>
+    <string name="select_color">Select color</string>
+    <string name="select_emoji">Select emoji</string>
+    <string name="color_label">Color label</string>
+    <string name="selected_color">Selected color: %s</string>
+
+    <!-- Recurrence -->
+    <string name="pomodoro_sessions">Pomodoro sessions</string>
+    <string name="pomodoro_sessions_desc">Specify the number of Pomodoro sessions for this task</string>
+    <string name="number_of_sessions">Number of sessions</string>
+    <string name="pomodoro_sessions_count">%d sessions</string>
+    <string name="recurrence">Recurrence</string>
+    <string name="recurring_task">Recurring task</string>
+    <string name="recurrence_type">Recurrence type</string>
+    <string name="select_days">Select days of the week</string>
+    <string name="repeat_on_days">Repeat on days</string>
+    <string name="repeat_on_day_of_month">Repeat on specific day of month</string>
+    <string name="repeat_every_x_days">Repeat every X days</string>
+    <string name="enter_day_1_31">Enter day (1-31)</string>
+    <string name="valid_values_1_31">Valid values: 1 to 31</string>
+    <string name="days_interval">Days interval</string>
+    <string name="enter_days_count">Enter number of days</string>
+    <string name="every_x_days_explanation">Task will repeat every specified days</string>
+    <string name="day_of_month">Day of month</string>
+    <string name="day">Day</string>
+    <string name="day_of_month_note">If the day doesn\'t exist in the month, the last day of the month will be used</string>
+    <string name="repeat_every">Repeat every</string>
+    <string name="days">days</string>
+    <string name="remove_recurrence">Remove recurrence</string>
+    <string name="weekly_on">Weekly on %1$s</string>
+    <string name="monthly_on_day">Monthly on day %1$d</string>
+    <string name="every_n_days">Every %1$d days</string>
+    <string name="yearly">Yearly</string>
+
+    <!-- Days of Week -->
+    <string name="monday">Monday</string>
+    <string name="tuesday">Tuesday</string>
+    <string name="wednesday">Wednesday</string>
+    <string name="thursday">Thursday</string>
+    <string name="friday">Friday</string>
+    <string name="saturday">Saturday</string>
+    <string name="sunday">Sunday</string>
+    <string name="monday_short">Mon</string>
+    <string name="tuesday_short">Tue</string>
+    <string name="wednesday_short">Wed</string>
+    <string name="thursday_short">Thu</string>
+    <string name="friday_short">Fri</string>
+    <string name="saturday_short">Sat</string>
+    <string name="sunday_short">Sun</string>
+
+    <!-- Date and Time -->
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+    <string name="filter_tasks">Filter tasks</string>
+    <string name="clear_filters">Clear filters</string>
+
+    <!-- Habits Screen -->
+    <string name="no_habits">No habits</string>
+    <string name="add_habit">Add habit</string>
+    <string name="habit_completed">Habit marked!</string>
+    <string name="streak">Streak: %d days</string>
+    <string name="best_streak">Record: %d days</string>
+    <string name="today_progress">Today: %d/%d</string>
+    <string name="mark_as_not_completed">Mark as not completed</string>
+    <string name="search_habits">Search habits</string>
+    <string name="no_habits_yet">You don\'t have any habits yet</string>
+    <string name="no_habits_found">No habits found</string>
+    <string name="no_archived_habits">You don\'t have any archived habits</string>
+    <string name="try_different_search">Try changing search parameters or filters</string>
+    <string name="archive_habits_tip">Archive habits to hide them from the main list</string>
+    <string name="create_habit_tip">Start creating good habits to achieve your goals</string>
+    <string name="create_first_habit">Create first habit</string>
+    <string name="no_habits_match_filters">No habits match your filters</string>
+    <string name="try_changing_filters">Try adjusting filters to see more habits</string>
+    <string name="create_your_first_habit">Create your first habit to start tracking progress</string>
+    <string name="new_habit">New habit</string>
+    <string name="mark_as_completed">Mark as completed</string>
+    <string name="habit">Habit</string>
+    <string name="mark_habit">Mark habit completed</string>
+    <string name="mark">Mark</string>
+    <string name="delete_habit_confirmation">Delete habit?</string>
+    <string name="delete_habit_confirmation_message">Are you sure you want to delete the habit \"%1$s\"? This action cannot be undone.</string>
+    <string name="habit_deleted">Habit deleted</string>
+
+    <!-- Habits View Modes -->
+    <string name="view_mode">View mode</string>
+    <string name="view_list">List</string>
+    <string name="view_grid">Grid</string>
+    <string name="view_categories">By categories</string>
+    <string name="view_list_description">Detailed list with action buttons</string>
+    <string name="view_grid_description">Compact grid of habits</string>
+    <string name="view_categories_description">Grouped by categories</string>
+    <string name="all_completed">All completed</string>
+    <string name="partially_completed">Partially completed</string>
+    <string name="started">Started</string>
+    <string name="not_completed">Not completed</string>
+    <string name="minutes">min</string>
+    <string name="increase">Increase</string>
+    <string name="decrease">Decrease</string>
+    <string name="previous_week">Previous week</string>
+    <string name="next_week">Next week</string>
+
+    <!-- Habit Sorting -->
+    <string name="name_asc">By name (A-Z)</string>
+    <string name="name_desc">By name (Z-A)</string>
+    <string name="streak_asc">By streak (asc.)</string>
+    <string name="streak_desc">By streak (desc.)</string>
+    <string name="progress_asc">By progress (asc.)</string>
+    <string name="progress_desc">By progress (desc.)</string>
+    <string name="creation_asc">By creation date (old → new)</string>
+    <string name="creation_desc">By creation date (new → old)</string>
+
+    <!-- Habit Detail -->
+    <string name="habit_details">Habit details</string>
+    <string name="edit_habit">Edit</string>
+    <string name="archive_habit">Archive</string>
+    <string name="delete_habit">Delete</string>
+    <string name="frequency">Frequency</string>
+    <string name="progress">Progress</string>
+    <string name="history">History</string>
+    <string name="completion_history">Completion history</string>
+    <string name="daily_progress">Daily progress</string>
+    <string name="week">Week</string>
+    <string name="month">Month</string>
+    <string name="target">Target</string>
+    <string name="share_habit">Share habit</string>
+    <string name="unarchive_habit">Restore from archive</string>
+    <string name="current_streak">Current streak</string>
+    <string name="increment">Increment</string>
+    <string name="decrement">Decrement</string>
+
+    <!-- Habit Edit -->
+    <string name="create_habit">Create habit</string>
+    <string name="update_habit">Update habit</string>
+    <string name="habit_title">Habit title</string>
+    <string name="habit_title_hint">Enter habit title</string>
+    <string name="habit_description_hint">Enter goal or description</string>
+    <string name="daily">Daily</string>
+    <string name="weekly">Weekly</string>
+    <string name="monthly">Monthly</string>
+    <string name="custom">Custom</string>
+    <string name="habit_type">Habit type</string>
+    <string name="binary_habit">Binary (yes/no)</string>
+    <string name="quantity_habit">Quantity (with progress)</string>
+    <string name="time_habit">Time-based (in minutes)</string>
+    <string name="target_value">Target value</string>
+    <string name="specific_days">On days: %1$s</string>
+    <string name="times_per_week">%1$d times per week</string>
+    <string name="times_per_month">%1$d times per month</string>
+
+    <!-- Pomodoro -->
+    <string name="pomodoro">Pomodoro</string>
+    <string name="work">Work</string>
+    <string name="short_break">Short break</string>
+    <string name="long_break">Long break</string>
+    <string name="start">Start</string>
+    <string name="pause">Pause</string>
+    <string name="stop">Stop</string>
+    <string name="reset">Reset</string>
+    <string name="pomodoro_settings">Timer settings</string>
+    <string name="work_duration">Work duration</string>
+    <string name="short_break_duration">Short break duration</string>
+    <string name="long_break_duration">Long break duration</string>
+    <string name="cycles_before_long_break">Cycles before long break</string>
+    <string name="create_new_task_for_pomodoro">Create a new task to use with Pomodoro</string>
+    <string name="stopwatch">Stopwatch</string>
+    <string name="auto_start_breaks">Automatically start breaks</string>
+    <string name="auto_start_pomodoros">Automatically start work</string>
+    <string name="sound_enabled">Sound notifications</string>
+    <string name="vibration_enabled">Vibration</string>
+    <string name="keep_screen_on">Keep screen on</string>
+    <string name="select_task">Select task</string>
+    <string name="select_task_for_pomodoro">Select a task you\'ll be working on</string>
+    <string name="today_statistics">Today\'s statistics</string>
+    <string name="completed_sessions">Completed sessions</string>
+    <string name="focus_time">Focus time</string>
+    <string name="selected_task">selected task?</string>
+    <string name="estimated_sessions">Planned sessions</string>
+    <string name="total_focus_time">Total focus time</string>
+    <string name="start_session">Start</string>
+    <string name="timer_durations">Timer Durations</string>
+    <string name="auto_start">Auto Start</string>
+    <string name="notifications_and_behavior">Notifications &amp; Behavior</string>
+    <string name="auto_start_breaks_desc">Automatically start breaks after work sessions</string>
+    <string name="auto_start_pomodoros_desc">Automatically start work sessions after breaks</string>
+    <string name="sound_enabled_desc">Play sound notifications when timer completes</string>
+    <string name="vibration_enabled_desc">Vibrate device when timer completes</string>
+    <string name="keep_screen_on_desc">Keep the screen on while timer is running</string>
+
+    <!-- Statistics -->
+    <string name="statistics_title">Statistics</string>
+    <string name="task_completion">Task completion</string>
+    <string name="habit_consistency">Habit consistency</string>
+    <string name="productivity_score">Productivity score</string>
+    <string name="daily_view">Day</string>
+    <string name="weekly_view">Week</string>
+    <string name="monthly_view">Month</string>
+    <string name="yearly_view">Year</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="appearance">Appearance</string>
+    <string name="theme">Theme</string>
+    <string name="dark_mode">Dark mode</string>
+    <string name="light_mode">Light mode</string>
+    <string name="system_theme">System</string>
+    <string name="notifications">Notifications</string>
+    <string name="language">Language</string>
+    <string name="data">Data</string>
+    <string name="backup_restore">Backup and restore</string>
+    <string name="export_data">Export data</string>
+    <string name="import_data">Import data</string>
+    <string name="clear_data">Clear data</string>
+    <string name="about">About</string>
+    <string name="version">Version</string>
+    <string name="quiet_hours">Quiet hours</string>
+    <string name="quiet_hours_start">Quiet hours start</string>
+    <string name="quiet_hours_end">Quiet hours end</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome">Welcome to DHbt</string>
+    <string name="onboarding_tasks">Manage your tasks</string>
+    <string name="onboarding_habits">Create good habits</string>
+    <string name="onboarding_pomodoro">Use the Pomodoro technique</string>
+    <string name="onboarding_statistics">Track your progress</string>
+    <string name="onboarding_personalization">Personalization</string>
+    <string name="onboarding_name">What\'s your name?</string>
+    <string name="onboarding_wakeup_time">What time do you wake up?</string>
+    <string name="onboarding_sleep_time">What time do you go to sleep?</string>
+    <string name="onboarding_goal">What is your main goal?</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_finish">Start</string>
+
+    <!-- Subscription -->
+    <string name="premium">Premium</string>
+    <string name="premium_description">Unlock all features</string>
+    <string name="monthly_subscription">Monthly subscription</string>
+    <string name="yearly_subscription">Yearly subscription</string>
+    <string name="lifetime_subscription">Lifetime access</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="restore_purchases">Restore purchases</string>
+    <string name="premium_features">Premium features</string>
+
+    <!-- Dialogs -->
+    <string name="delete_task_confirmation">Are you sure you want to delete this task? This action cannot be undone.</string>
+
+    <!-- Time Format -->
+    <string name="hours_short">h</string>
+    <string name="minutes_short">min</string>
+    <string name="time_format">%1$d %2$s %3$d %4$s</string>
+    <string name="time_format_minutes_only">%1$d %2$s</string>
+
+    <!-- Month Names -->
+    <string name="january">January</string>
+    <string name="february">February</string>
+    <string name="march">March</string>
+    <string name="april">April</string>
+    <string name="may">May</string>
+    <string name="june">June</string>
+    <string name="july">July</string>
+    <string name="august">August</string>
+    <string name="september">September</string>
+    <string name="october">October</string>
+    <string name="november">November</string>
+    <string name="december">December</string>
+</resources>

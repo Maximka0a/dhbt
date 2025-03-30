@@ -72,6 +72,34 @@ class PomodoroViewModel @Inject constructor(
         loadTodayStats()
     }
 
+    // Метод для загрузки задачи по ID (вызывается при открытии экрана с параметром taskId)
+    fun loadTaskById(taskId: String) {
+        if (taskId.isEmpty()) return
+
+        viewModelScope.launch {
+            _tasksLoading.value = true
+            try {
+                // Пытаемся получить задачу по ID
+                val task = taskRepository.getTaskById(taskId)
+
+                // Если задача существует, выбираем её и загружаем статистику
+                task?.let {
+                    // Устанавливаем тип таймера в Pomodoro, если он ещё не установлен
+                    if (_uiState.value.timerType != TimerType.POMODORO) {
+                        onTimerTypeSelected(TimerType.POMODORO)
+                    }
+
+                    // Выбираем задачу (это запустит обновление статистики)
+                    onTaskSelected(it)
+                }
+            } catch (e: Exception) {
+                // Обработка ошибок получения задачи
+            } finally {
+                _tasksLoading.value = false
+            }
+        }
+    }
+
     // Метод для обновления времени для таймера на основе настроек
     private fun updateTimerDurationFromPreferences(prefs: PomodoroPreferences) {
         _uiState.update { currentState ->
@@ -115,6 +143,11 @@ class PomodoroViewModel @Inject constructor(
                 elapsedTime = 0L
             )
         }
+
+        // Если есть выбранная задача, обновляем таймер для неё
+        if (timerType == TimerType.POMODORO && _uiState.value.selectedTask != null) {
+            setupTimerForTask(_uiState.value.selectedTask!!, _uiState.value.completedPomodoros)
+        }
     }
 
     fun onPomodoroSessionTypeSelected(sessionType: PomodoroSessionType) {
@@ -124,7 +157,14 @@ class PomodoroViewModel @Inject constructor(
         }
 
         val totalTime = when (sessionType) {
-            PomodoroSessionType.WORK -> TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+            PomodoroSessionType.WORK -> {
+                // Если выбрана задача и это рабочая сессия, используем время из задачи
+                if (_uiState.value.selectedTask != null) {
+                    calculateSessionDurationForTask(_uiState.value.selectedTask!!)
+                } else {
+                    TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                }
+            }
             PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
             PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
         }
@@ -139,54 +179,124 @@ class PomodoroViewModel @Inject constructor(
         }
     }
 
+    // Обновленный метод выбора задачи
     fun onTaskSelected(task: Task?) {
-        // Очищаем предыдущую статистику по задаче
-        _taskStats.value = TaskPomodoroStats()
+        viewModelScope.launch {
+            try {
+                _tasksLoading.value = true
 
-        if (task == null) {
-            // Если задача не выбрана, возвращаемся к настройкам по умолчанию
-            _uiState.update { it.copy(
-                selectedTask = null,
-                totalTaskSessions = 0, // Сбрасываем количество сессий задачи
-                completedPomodoros = 0  // Сбрасываем счетчик выполненных помидоров
-            )}
+                if (task == null) {
+                    // Очищаем предыдущую статистику по задаче
+                    _taskStats.value = TaskPomodoroStats()
 
-            // Возвращаем время таймера из настроек
-            val defaultTime = when (_uiState.value.pomodoroSessionType) {
-                PomodoroSessionType.WORK -> TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
-                PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
-                PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
+                    // Сбрасываем состояние, связанное с задачей
+                    _uiState.update { it.copy(
+                        selectedTask = null,
+                        totalTaskSessions = 0,
+                        completedPomodoros = 0
+                    )}
+
+                    // Возвращаем время таймера из настроек
+                    val defaultTime = when (_uiState.value.pomodoroSessionType) {
+                        PomodoroSessionType.WORK -> TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                        PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
+                        PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
+                    }
+
+                    _uiState.update { it.copy(
+                        remainingTime = defaultTime,
+                        totalTime = defaultTime
+                    )}
+
+                    _tasksLoading.value = false
+                    return@launch
+                }
+
+                // Задача выбрана - обновляем состояние
+                val estimatedSessions = task.estimatedPomodoroSessions ?: 0
+                _uiState.update { it.copy(
+                    selectedTask = task,
+                    totalTaskSessions = estimatedSessions
+                )}
+
+                // Загружаем все данные по задаче
+                loadTaskStats(task.id)
+
+                // Переключаемся на режим Pomodoro, если это еще не сделано
+                if (_uiState.value.timerType != TimerType.POMODORO) {
+                    onTimerTypeSelected(TimerType.POMODORO)
+                }
+
+                // Настраиваем таймер для выбранной задачи
+                if (_uiState.value.timerState != TimerState.RUNNING &&
+                    _uiState.value.timerState != TimerState.PAUSED) {
+                    setupTimerForTask(task, 0)
+                }
+
+                _tasksLoading.value = false
+            } catch (e: Exception) {
+                _tasksLoading.value = false
+                // Обработка ошибок
             }
+        }
+    }
 
-            _uiState.update { it.copy(
-                remainingTime = defaultTime,
-                totalTime = defaultTime
-            )}
-
+    // Новый метод для настройки таймера под задачу
+    private fun setupTimerForTask(task: Task, completedSessions: Int) {
+        if (_uiState.value.timerState == TimerState.RUNNING ||
+            _uiState.value.timerState == TimerState.PAUSED ||
+            _uiState.value.pomodoroSessionType != PomodoroSessionType.WORK) {
             return
         }
 
-        // Получаем количество сессий из задачи или используем значение по умолчанию
-        val estimatedSessions = task.estimatedPomodoroSessions ?: 0
+        // Вычисляем продолжительность на основе параметров задачи
+        val sessionDuration = calculateSessionDurationForTask(task)
 
-        // Задача выбрана, обновляем состояние с правильным количеством сессий
+        // Обновляем таймер
         _uiState.update { it.copy(
-            selectedTask = task,
-            totalTaskSessions = estimatedSessions // Устанавливаем количество сессий из задачи
+            remainingTime = sessionDuration,
+            totalTime = sessionDuration,
+            completedPomodoros = completedSessions
         )}
+    }
 
+    // Помощник для вычисления продолжительности сессии на основе задачи
+    private fun calculateSessionDurationForTask(task: Task): Long {
+        val estimatedSessions = task.estimatedPomodoroSessions ?: 0
+        val estimatedMinutes = task.duration ?: 0
+
+        return when {
+            // Если указано и время, и количество сессий, вычисляем время на одну сессию
+            estimatedMinutes > 0 && estimatedSessions > 0 -> {
+                val minutesPerSession = (estimatedMinutes / estimatedSessions).coerceAtLeast(1)
+                TimeUnit.MINUTES.toMillis(minutesPerSession.toLong())
+            }
+            // Если указано только время, используем его целиком
+            estimatedMinutes > 0 -> {
+                TimeUnit.MINUTES.toMillis(estimatedMinutes.toLong())
+            }
+            // Иначе используем значение по умолчанию
+            else -> {
+                TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+            }
+        }
+    }
+
+    // Загрузка статистики по задаче
+    private fun loadTaskStats(taskId: String) {
         viewModelScope.launch {
             try {
-                // Загружаем статистику по времени, потраченному на задачу
-                val focusTimeForTask = pomodoroRepository.getTotalFocusTimeForTask(task.id)
+                // Загружаем статистику по времени
+                val focusTimeForTask = pomodoroRepository.getTotalFocusTimeForTask(taskId)
 
                 // Получаем информацию о задаче
+                val task = taskRepository.getTaskById(taskId) ?: return@launch
+                val estimatedSessions = task.estimatedPomodoroSessions ?: 0
                 val estimatedMinutes = task.duration ?: 0
 
-                // Загружаем количество завершенных сессий для задачи
-                var completedSessions = 0
-                pomodoroRepository.getSessionsForTask(task.id).collect { sessions ->
-                    completedSessions = sessions.count { it.isCompleted && it.type == PomodoroSessionType.WORK }
+                // Загружаем завершенные сессии
+                pomodoroRepository.getSessionsForTask(taskId).collect { sessions ->
+                    val completedSessions = sessions.count { it.isCompleted && it.type == PomodoroSessionType.WORK }
 
                     // Обновляем статистику по задаче
                     _taskStats.value = TaskPomodoroStats(
@@ -196,60 +306,12 @@ class PomodoroViewModel @Inject constructor(
                         estimatedTotalSessions = estimatedSessions
                     )
 
-                    // Обновляем счетчик выполненных сессий, если задача имеет оценку по сессиям
+                    // Обновляем счетчик выполненных сессий
                     _uiState.update { it.copy(completedPomodoros = completedSessions) }
-
-                    // Вычисляем время для одного сеанса, если указаны и duration, и estimatedPomodoroSessions
-                    if (estimatedMinutes > 0 && estimatedSessions > 0 &&
-                        _uiState.value.timerState == TimerState.IDLE &&
-                        _uiState.value.pomodoroSessionType == PomodoroSessionType.WORK) {
-
-                        // Рассчитываем время для одного сеанса: общее время / количество сеансов
-                        val minutesPerSession = estimatedMinutes / estimatedSessions
-                        // Устанавливаем минимум в 1 минуту для сеанса
-                        val sessionTimeMinutes = minutesPerSession.coerceAtLeast(1)
-                        val sessionTimeMs = TimeUnit.MINUTES.toMillis(sessionTimeMinutes.toLong())
-
-                        _uiState.update { it.copy(
-                            remainingTime = sessionTimeMs,
-                            totalTime = sessionTimeMs
-                        )}
-                    }
-                    // Если указано только duration, но нет estimatedPomodoroSessions
-                    else if (estimatedMinutes > 0 && estimatedSessions <= 0 &&
-                        _uiState.value.timerState == TimerState.IDLE &&
-                        _uiState.value.pomodoroSessionType == PomodoroSessionType.WORK) {
-
-                        // Используем всё время задачи как один сеанс
-                        val taskTimeMs = TimeUnit.MINUTES.toMillis(estimatedMinutes.toLong())
-                        _uiState.update { it.copy(
-                            remainingTime = taskTimeMs,
-                            totalTime = taskTimeMs
-                        )}
-                    }
-                    // Если нет ни одного параметра, используем настройки по умолчанию для длительности сеанса
-                    else if (_uiState.value.timerState == TimerState.IDLE &&
-                        _uiState.value.pomodoroSessionType == PomodoroSessionType.WORK) {
-                        val defaultWorkTime = TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
-                        _uiState.update { it.copy(
-                            remainingTime = defaultWorkTime,
-                            totalTime = defaultWorkTime
-                        )}
-                    }
                 }
             } catch (e: Exception) {
                 // Обработка ошибок
                 _taskStats.value = TaskPomodoroStats()
-
-                // В случае ошибки используем стандартную длительность из настроек
-                if (_uiState.value.timerState == TimerState.IDLE &&
-                    _uiState.value.pomodoroSessionType == PomodoroSessionType.WORK) {
-                    val defaultWorkTime = TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
-                    _uiState.update { it.copy(
-                        remainingTime = defaultWorkTime,
-                        totalTime = defaultWorkTime
-                    )}
-                }
             }
         }
     }
@@ -268,14 +330,20 @@ class PomodoroViewModel @Inject constructor(
         viewModelScope.launch {
             // Убеждаемся, что таймер имеет правильное начальное значение
             val currentSessionType = _uiState.value.pomodoroSessionType
-            val totalTime = when (currentSessionType) {
-                PomodoroSessionType.WORK -> TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
-                PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
-                PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
-            }
 
-            // Проверяем, что оставшееся время установлено правильно
+            // Если время не установлено, инициализируем его
             if (_uiState.value.remainingTime <= 0) {
+                val totalTime = when (currentSessionType) {
+                    PomodoroSessionType.WORK -> {
+                        if (_uiState.value.selectedTask != null) {
+                            calculateSessionDurationForTask(_uiState.value.selectedTask!!)
+                        } else {
+                            TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                        }
+                    }
+                    PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
+                    PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
+                }
                 _uiState.update { it.copy(remainingTime = totalTime, totalTime = totalTime) }
             }
 
@@ -324,7 +392,7 @@ class PomodoroViewModel @Inject constructor(
                             // После работы обновляем счетчик завершенных помидоров
                             val newCompletedPomodoros = _uiState.value.completedPomodoros + 1
 
-                            // После работы идет перерыв (исправляем логику определения типа перерыва)
+                            // После работы идет перерыв
                             val nextSessionType = if (newCompletedPomodoros % _preferences.value.pomodorosUntilLongBreak == 0) {
                                 PomodoroSessionType.LONG_BREAK
                             } else {
@@ -353,7 +421,11 @@ class PomodoroViewModel @Inject constructor(
                             }
                         } else {
                             // После перерыва идет работа
-                            val workTime = TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                            val workTime = if (_uiState.value.selectedTask != null) {
+                                calculateSessionDurationForTask(_uiState.value.selectedTask!!)
+                            } else {
+                                TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                            }
 
                             _uiState.update { it.copy(
                                 pomodoroSessionType = PomodoroSessionType.WORK,
@@ -370,44 +442,6 @@ class PomodoroViewModel @Inject constructor(
                         }
                     }
                 }
-            }
-        }
-    }
-
-    // Загрузка статистики по конкретной задаче
-    private fun loadTaskStats(taskId: String) {
-        viewModelScope.launch {
-            try {
-                // Загружаем статистику по времени, потраченному на задачу
-                val focusTimeForTask = pomodoroRepository.getTotalFocusTimeForTask(taskId)
-
-                // Получаем информацию о задаче
-                val task = taskRepository.getTaskById(taskId)
-                if (task != null) {
-                    val estimatedSessions = task.estimatedPomodoroSessions ?: 0
-                    val estimatedMinutes = task.duration ?: 0
-
-                    // Загружаем количество завершенных сессий для задачи
-                    var completedSessions = 0
-                    pomodoroRepository.getSessionsForTask(taskId).collect { sessions ->
-                        completedSessions = sessions.count { it.isCompleted && it.type == PomodoroSessionType.WORK }
-
-                        // Обновляем статистику по задаче
-                        _taskStats.value = TaskPomodoroStats(
-                            focusTimeMinutes = focusTimeForTask,
-                            estimatedTotalMinutes = estimatedMinutes,
-                            completedSessions = completedSessions,
-                            estimatedTotalSessions = estimatedSessions
-                        )
-
-                        // Обновляем счетчик выполненных сессий если настроено ожидаемое количество
-                        if (estimatedSessions > 0) {
-                            _uiState.update { it.copy(completedPomodoros = completedSessions) }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                // В случае ошибки оставляем текущую статистику
             }
         }
     }
@@ -503,7 +537,13 @@ class PomodoroViewModel @Inject constructor(
 
                 // Сбрасываем таймер
                 val totalTime = when (_uiState.value.pomodoroSessionType) {
-                    PomodoroSessionType.WORK -> TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                    PomodoroSessionType.WORK -> {
+                        if (_uiState.value.selectedTask != null) {
+                            calculateSessionDurationForTask(_uiState.value.selectedTask!!)
+                        } else {
+                            TimeUnit.MINUTES.toMillis(_preferences.value.workDuration.toLong())
+                        }
+                    }
                     PomodoroSessionType.SHORT_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.shortBreakDuration.toLong())
                     PomodoroSessionType.LONG_BREAK -> TimeUnit.MINUTES.toMillis(_preferences.value.longBreakDuration.toLong())
                 }
@@ -626,6 +666,7 @@ data class PomodoroUiState(
     val selectedTask: Task? = null,
     val totalTaskSessions: Int = 0 // Новое поле для общего количества сессий задачи
 )
+
 data class PomodoroStats(
     val completedSessions: Int = 0,
     val totalFocusMinutes: Int = 0
