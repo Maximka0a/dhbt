@@ -187,105 +187,158 @@ class HabitRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getHabitProgressForToday(habitId: String): Float {
-        // Используем timestamp для сегодняшнего дня вместо строки
-
+        // Получаем сегодняшнюю дату как начало дня
         val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         val tracking = habitTrackingDao.getHabitTrackingForDate(
             habitId = habitId,
-            date = today // Передаем timestamp
+            date = today
         )
 
-        // Логирование для отладки
-        val value = tracking?.value ?: 0f
-        println("Получен прогресс для привычки $habitId: $value")
+        if (tracking == null) {
+            Timber.d("Нет записи трекинга для привычки $habitId на сегодня")
+            return 0f
+        }
 
-        return value
+        // Получаем привычку для определения типа
+        val habit = getHabitById(habitId)
+        if (habit == null) {
+            Timber.e("Привычка $habitId не найдена")
+            return 0f
+        }
+
+        // Возвращаем прогресс в зависимости от типа привычки
+        val progress = when (habit.type) {
+            HabitType.BINARY -> {
+                // Для бинарного типа: 1f если выполнено, иначе 0f
+                if (tracking.isCompleted) 1f else 0f
+            }
+            HabitType.QUANTITY -> {
+                // Для количественного типа: используем значение
+                tracking.value ?: 0f
+            }
+            HabitType.TIME -> {
+                // Для типа с временем: используем длительность
+                tracking.duration?.toFloat() ?: 0f
+            }
+        }
+
+        Timber.d("Получен прогресс для привычки $habitId: $progress (тип: ${habit.type})")
+        return progress
     }
 
     override suspend fun getAllHabitsProgressForToday(): Map<String, Float> {
-        // Конвертируем timestamp в String формат, который ожидает DAO
-        val today = LocalDate.now().toString()
+        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        // Теперь передаем String вместо Long
-        val trackings = habitTrackingDao.getAllHabitTrackingsForDate(date = today)
+        // Получаем все записи трекинга за сегодня
+        val trackings = habitTrackingDao.getAllHabitTrackingsForDate(today)
 
-        // Логирование для отладки
-        println("Получено ${trackings.size} записей прогресса привычек за сегодня")
-        trackings.forEach {
-            println("Привычка ${it.habitId}: прогресс ${it.value}")
+        // Создаем пустую карту для результатов
+        val progressMap = mutableMapOf<String, Float>()
+
+        // Обрабатываем каждую запись трекинга согласно типу привычки
+        for (tracking in trackings) {
+            val habit = getHabitById(tracking.habitId) ?: continue
+
+            // Определяем прогресс в зависимости от типа привычки
+            val progress = when (habit.type) {
+                HabitType.BINARY -> {
+                    // Для бинарной привычки: 1f если выполнена, иначе 0f
+                    if (tracking.isCompleted) 1f else 0f
+                }
+                HabitType.QUANTITY -> {
+                    // Для количественной привычки: используем значение
+                    tracking.value ?: 0f
+                }
+                HabitType.TIME -> {
+                    // Для временной привычки: конвертируем duration в float
+                    tracking.duration?.toFloat() ?: 0f
+                }
+            }
+
+            // Сохраняем в карту результатов
+            progressMap[tracking.habitId] = progress
+
+            Timber.d("Привычка ${habit.title} (тип: ${habit.type}): прогресс $progress")
         }
 
-        return trackings.associate { it.habitId to (it.value ?: 0f) }
+        return progressMap
     }
 
+    // Исправленная версия метода incrementHabitProgress в HabitRepositoryImpl
     override suspend fun incrementHabitProgress(habitId: String, dateMillis: Long) {
-        // Получаем привычку
         val habit = getHabitById(habitId) ?: return
-
-        // Проверяем, есть ли уже запись за выбранный день
         val existingTracking = getHabitTrackingForDate(habitId, dateMillis)
 
         if (existingTracking != null) {
-            // Обновляем существующую запись
             when (habit.type) {
                 HabitType.BINARY -> {
                     // Для бинарного типа просто отмечаем как выполненное
-                    val updatedTracking = existingTracking.copy(
-                        isCompleted = true
-                    )
+                    val updatedTracking = existingTracking.copy(isCompleted = true, value = 1f)
                     updateHabitTracking(updatedTracking)
+                    Timber.d("Обновлена бинарная привычка ${habit.title}, отмечена как выполненная")
                 }
-
                 HabitType.QUANTITY -> {
-                    // Для количественного типа увеличиваем значение на 1
+                    // Для количественных привычек увеличиваем значение
                     val currentValue = existingTracking.value ?: 0f
                     val newValue = currentValue + 1
                     val targetValue = habit.targetValue ?: 1f
-                    val isCompleted = newValue >= targetValue
-
                     val updatedTracking = existingTracking.copy(
                         value = newValue,
-                        isCompleted = isCompleted
+                        isCompleted = newValue >= targetValue
                     )
                     updateHabitTracking(updatedTracking)
+                    Timber.d("Обновлена количественная привычка ${habit.title}, прогресс: $newValue/$targetValue")
                 }
-
                 HabitType.TIME -> {
-                    // Для времени увеличиваем на 1 минуту
+                    // Для временных привычек увеличиваем duration
                     val currentDuration = existingTracking.duration ?: 0
                     val newDuration = currentDuration + 1
                     val targetDuration = habit.targetValue?.toInt() ?: 1
-                    val isCompleted = newDuration >= targetDuration
-
                     val updatedTracking = existingTracking.copy(
                         duration = newDuration,
-                        isCompleted = isCompleted
+                        isCompleted = newDuration >= targetDuration
                     )
                     updateHabitTracking(updatedTracking)
+                    Timber.d("Обновлена временная привычка ${habit.title}, длительность: $newDuration/$targetDuration мин")
                 }
             }
         } else {
-            // Создаем новую запись с начальным значением 1 (не с целевым значением)
-            val isCompleted = when (habit.type) {
-                HabitType.BINARY -> true
-                HabitType.QUANTITY -> 1f >= (habit.targetValue ?: 1f)
-                HabitType.TIME -> 1 >= (habit.targetValue?.toInt() ?: 1)
+            // Создаем новую запись с начальными значениями
+            val newTracking = when (habit.type) {
+                HabitType.BINARY -> {
+                    HabitTracking(
+                        id = UUID.randomUUID().toString(),
+                        habitId = habitId,
+                        date = dateMillis,
+                        isCompleted = true,
+                        value = 1f,  // Добавляем значение 1f для бинарной привычки
+                        duration = null
+                    )
+                }
+                HabitType.QUANTITY -> {
+                    HabitTracking(
+                        id = UUID.randomUUID().toString(),
+                        habitId = habitId,
+                        date = dateMillis,
+                        isCompleted = 1f >= (habit.targetValue ?: 1f),
+                        value = 1f,
+                        duration = null
+                    )
+                }
+                HabitType.TIME -> {
+                    HabitTracking(
+                        id = UUID.randomUUID().toString(),
+                        habitId = habitId,
+                        date = dateMillis,
+                        isCompleted = 1 >= (habit.targetValue?.toInt() ?: 1),
+                        value = null,
+                        duration = 1
+                    )
+                }
             }
-
-            val value = if (habit.type == HabitType.QUANTITY) 1f else null
-            val duration = if (habit.type == HabitType.TIME) 1 else null
-
-            val tracking = HabitTracking(
-                id = UUID.randomUUID().toString(),
-                habitId = habitId,
-                date = dateMillis,  // Use the provided date
-                isCompleted = isCompleted,
-                value = value,
-                duration = duration
-            )
-
-            trackHabit(tracking)
+            trackHabit(newTracking)
+            Timber.d("Создана новая запись для привычки ${habit.title}, тип: ${habit.type}")
         }
     }
 
@@ -412,23 +465,24 @@ class HabitRepositoryImpl @Inject constructor(
         val habit = getHabitById(habitId) ?: return 0f
         val tracking = getHabitTrackingForDate(habitId, date)
 
-        if (tracking == null || !tracking.isCompleted) return 0f
-
         return when (habit.type) {
-            HabitType.BINARY -> 1f
-            HabitType.QUANTITY -> {
-                val targetValue = habit.targetValue ?: 1f
-                val value = tracking.value ?: 0f
-                (value / targetValue).coerceIn(0f, 1f)
+            HabitType.BINARY -> {
+                // Для бинарных привычек - либо 0, либо 1
+                if (tracking?.isCompleted == true) 1f else 0f
             }
-
+            HabitType.QUANTITY -> {
+                // Для количественных привычек - показываем прогресс на основе значения,
+                // даже если привычка не отмечена как выполненная
+                val targetValue = habit.targetValue ?: 1f
+                val currentValue = tracking?.value ?: 0f
+                (currentValue / targetValue).coerceIn(0f, 1f)
+            }
             HabitType.TIME -> {
-                val targetDuration = habit.targetValue?.toInt() ?: 0
-                val duration = tracking.duration ?: 0
-                if (targetDuration <= 0) 0f else (duration.toFloat() / targetDuration).coerceIn(
-                    0f,
-                    1f
-                )
+                // Для привычек с временем - показываем прогресс на основе длительности,
+                // даже если привычка не отмечена как выполненная
+                val targetDuration = habit.targetValue ?: 1f
+                val currentDuration = tracking?.duration?.toFloat() ?: 0f
+                (currentDuration / targetDuration).coerceIn(0f, 1f)
             }
         }
     }

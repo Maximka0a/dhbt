@@ -10,10 +10,13 @@ import com.example.dhbt.domain.model.Habit
 import com.example.dhbt.domain.model.HabitFrequency
 import com.example.dhbt.domain.model.HabitStatus
 import com.example.dhbt.domain.model.HabitType
+import com.example.dhbt.domain.model.Notification
+import com.example.dhbt.domain.model.NotificationTarget
 import com.example.dhbt.domain.model.PeriodType
 import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.repository.CategoryRepository
 import com.example.dhbt.domain.repository.HabitRepository
+import com.example.dhbt.domain.repository.NotificationRepository
 import com.example.dhbt.domain.repository.TagRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,8 +27,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.DayOfWeek
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -34,6 +39,7 @@ class EditHabitViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val categoryRepository: CategoryRepository,
     private val tagRepository: TagRepository,
+    private val notificationRepository: NotificationRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -59,6 +65,7 @@ class EditHabitViewModel @Inject constructor(
     val events: SharedFlow<EditHabitOneTimeEvent> = _events
 
     init {
+        Timber.d("ViewModel инициализирован. isCreationMode=$isCreationMode, habitId=$habitId")
         loadInitialData()
     }
 
@@ -78,9 +85,18 @@ class EditHabitViewModel @Inject constructor(
             is EditHabitEvent.TargetValueChanged -> updateTargetValue(event.value)
             is EditHabitEvent.UnitOfMeasurementChanged -> updateUnitOfMeasurement(event.unit)
             is EditHabitEvent.TargetStreakChanged -> updateTargetStreak(event.streak)
-            is EditHabitEvent.ReminderEnabledChanged -> updateReminderEnabled(event.enabled)
-            is EditHabitEvent.ReminderTimeChanged -> updateReminderTime(event.time)
-            is EditHabitEvent.ReminderDaysChanged -> updateReminderDays(event.days)
+            is EditHabitEvent.ReminderEnabledChanged -> {
+                Timber.d("Изменение статуса напоминания на ${event.enabled}")
+                updateReminderEnabled(event.enabled)
+            }
+            is EditHabitEvent.ReminderTimeChanged -> {
+                Timber.d("Изменение времени напоминания на ${event.time}")
+                updateReminderTime(event.time)
+            }
+            is EditHabitEvent.ReminderDaysChanged -> {
+                Timber.d("Изменение дней напоминания на ${event.days}")
+                updateReminderDays(event.days)
+            }
             is EditHabitEvent.TagsChanged -> updateTags(event.tagIds)
             is EditHabitEvent.CreateNewTag -> createNewTag(event.name, event.color)
             is EditHabitEvent.SaveHabit -> saveHabit()
@@ -104,6 +120,7 @@ class EditHabitViewModel @Inject constructor(
                     setDefaultValues()
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при загрузке начальных данных")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to load data: ${e.localizedMessage}"))
             }
         }
@@ -126,47 +143,111 @@ class EditHabitViewModel @Inject constructor(
                 periodType = PeriodType.WEEK
             )
         }
+        Timber.d("Установлены значения по умолчанию")
     }
 
     private fun loadHabit(id: String) {
         viewModelScope.launch {
             try {
+                Timber.d("Загрузка привычки с ID: $id")
                 val (habit, frequency) = habitRepository.getHabitWithFrequency(id)
+                Timber.d("Загружена привычка: ${habit.title}")
 
                 val daysOfWeek = frequency?.daysOfWeek?.mapNotNull { dayValue ->
                     try {
                         DayOfWeek.of(dayValue)
                     } catch (e: Exception) {
+                        Timber.e(e, "Ошибка при преобразовании дня недели: $dayValue")
                         null
                     }
                 }?.toSet() ?: emptySet()
 
                 val habitTags = tagRepository.getTagsForTask(id).first()
+                Timber.d("Загружено ${habitTags.size} тегов для привычки")
 
-                _uiState.update { state ->
-                    state.copy(
-                        title = habit.title,
-                        description = habit.description ?: "",
-                        iconEmoji = habit.iconEmoji ?: "📋",
-                        selectedColor = habit.color ?: "#FF6200EE",
-                        habitType = habit.type,
-                        categoryId = habit.categoryId,
-                        frequencyType = frequency?.type ?: FrequencyType.DAILY,
-                        selectedDaysOfWeek = daysOfWeek,
-                        timesPerPeriod = frequency?.timesPerPeriod ?: 1,
-                        periodType = frequency?.periodType ?: PeriodType.WEEK,
-                        targetValue = habit.targetValue ?: 1f,
-                        unitOfMeasurement = habit.unitOfMeasurement ?: "",
-                        targetStreak = habit.targetStreak ?: 0,
-                        status = habit.status,
-                        selectedTagIds = habitTags.map { it.id }.toSet(),
-                        currentStreak = habit.currentStreak,
-                        bestStreak = habit.bestStreak
-                    )
+                // Загрузка существующих уведомлений для привычки
+                try {
+                    Timber.d("Запрос уведомлений для привычки с ID: $id")
+                    val notifications = notificationRepository.getNotificationsForTarget(id, NotificationTarget.HABIT).first()
+                    Timber.d("Получено ${notifications.size} уведомлений для привычки")
+
+                    val notification = notifications.firstOrNull()
+                    if (notification != null) {
+                        Timber.d("Найдено уведомление: id=${notification.id}, time=${notification.time}, enabled=${notification.isEnabled}")
+                    } else {
+                        Timber.d("Уведомления для привычки не найдены")
+                    }
+
+                    _uiState.update { state ->
+                        state.copy(
+                            title = habit.title,
+                            description = habit.description ?: "",
+                            iconEmoji = habit.iconEmoji ?: "📋",
+                            selectedColor = habit.color ?: "#FF6200EE",
+                            habitType = habit.type,
+                            categoryId = habit.categoryId,
+                            frequencyType = frequency?.type ?: FrequencyType.DAILY,
+                            selectedDaysOfWeek = daysOfWeek,
+                            timesPerPeriod = frequency?.timesPerPeriod ?: 1,
+                            periodType = frequency?.periodType ?: PeriodType.WEEK,
+                            targetValue = habit.targetValue ?: 1f,
+                            unitOfMeasurement = habit.unitOfMeasurement ?: "",
+                            targetStreak = habit.targetStreak ?: 0,
+                            status = habit.status,
+                            selectedTagIds = habitTags.map { it.id }.toSet(),
+                            currentStreak = habit.currentStreak,
+                            bestStreak = habit.bestStreak,
+                            creationDate = habit.creationDate,
+                            // Обновление полей уведомлений из базы данных
+                            reminderEnabled = notification != null && notification.isEnabled,
+                            reminderTime = notification?.time?.let {
+                                try {
+                                    LocalTime.parse(it, DateTimeFormatter.ofPattern("HH:mm"))
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Ошибка при парсинге времени уведомления: $it")
+                                    LocalTime.of(9, 0)
+                                }
+                            } ?: LocalTime.of(9, 0),
+                            reminderDays = notification?.daysOfWeek?.mapNotNull {
+                                try {
+                                    DayOfWeek.of(it)
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Ошибка при парсинге дня недели: $it")
+                                    null
+                                }
+                            }?.toSet() ?: emptySet()
+                        )
+                    }
+                    Timber.d("Состояние UI обновлено с данными уведомлений: enabled=${notification != null && notification.isEnabled}")
+                } catch (e: Exception) {
+                    Timber.e(e, "Ошибка при загрузке уведомлений")
+                    _uiState.update { state ->
+                        state.copy(
+                            title = habit.title,
+                            description = habit.description ?: "",
+                            iconEmoji = habit.iconEmoji ?: "📋",
+                            selectedColor = habit.color ?: "#FF6200EE",
+                            habitType = habit.type,
+                            categoryId = habit.categoryId,
+                            frequencyType = frequency?.type ?: FrequencyType.DAILY,
+                            selectedDaysOfWeek = daysOfWeek,
+                            timesPerPeriod = frequency?.timesPerPeriod ?: 1,
+                            periodType = frequency?.periodType ?: PeriodType.WEEK,
+                            targetValue = habit.targetValue ?: 1f,
+                            unitOfMeasurement = habit.unitOfMeasurement ?: "",
+                            targetStreak = habit.targetStreak ?: 0,
+                            status = habit.status,
+                            selectedTagIds = habitTags.map { it.id }.toSet(),
+                            currentStreak = habit.currentStreak,
+                            bestStreak = habit.bestStreak,
+                            creationDate = habit.creationDate
+                        )
+                    }
                 }
 
                 validateForm()
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при загрузке привычки с ID: $id")
                 _saveResult.value = SaveResult.Error("Error loading habit: ${e.localizedMessage}")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to load habit: ${e.localizedMessage}"))
             }
@@ -179,8 +260,10 @@ class EditHabitViewModel @Inject constructor(
                 categoryRepository.getCategoriesByType(CategoryType.HABIT)
                     .collect { habitCategories ->
                         _categories.value = habitCategories
+                        Timber.d("Загружено ${habitCategories.size} категорий")
                     }
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при загрузке категорий")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to load categories"))
             }
         }
@@ -192,8 +275,10 @@ class EditHabitViewModel @Inject constructor(
                 tagRepository.getAllTags()
                     .collect { allTags ->
                         _tags.value = allTags
+                        Timber.d("Загружено ${allTags.size} тегов")
                     }
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при загрузке тегов")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to load tags"))
             }
         }
@@ -254,14 +339,17 @@ class EditHabitViewModel @Inject constructor(
 
     private fun updateReminderEnabled(enabled: Boolean) {
         _uiState.update { it.copy(reminderEnabled = enabled) }
+        Timber.d("Статус напоминания изменен на: $enabled")
     }
 
     private fun updateReminderTime(time: LocalTime) {
         _uiState.update { it.copy(reminderTime = time) }
+        Timber.d("Время напоминания изменено на: $time")
     }
 
     private fun updateReminderDays(days: Set<DayOfWeek>) {
         _uiState.update { it.copy(reminderDays = days) }
+        Timber.d("Дни недели для напоминания изменены на: $days")
     }
 
     private fun updateTags(tagIds: Set<String>) {
@@ -285,7 +373,9 @@ class EditHabitViewModel @Inject constructor(
                 val categoryId = categoryRepository.addCategory(newCategory)
                 updateCategory(categoryId)
                 emitEvent(EditHabitOneTimeEvent.CategoryCreated("Category created: $name"))
+                Timber.d("Создана новая категория: $name с ID: $categoryId")
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при создании категории")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to create category: ${e.localizedMessage}"))
             }
         }
@@ -308,7 +398,9 @@ class EditHabitViewModel @Inject constructor(
                 val updatedTags = _uiState.value.selectedTagIds + tagId
                 updateTags(updatedTags)
                 emitEvent(EditHabitOneTimeEvent.TagCreated("Tag created: $name"))
+                Timber.d("Создан новый тег: $name с ID: $tagId")
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при создании тега")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to create tag: ${e.localizedMessage}"))
             }
         }
@@ -341,8 +433,10 @@ class EditHabitViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                Timber.d("Начато сохранение привычки")
                 val state = _uiState.value
                 val newHabitId = habitId ?: UUID.randomUUID().toString()
+                Timber.d("ID привычки: $newHabitId (isCreationMode=$isCreationMode)")
 
                 val habit = Habit(
                     id = newHabitId,
@@ -361,6 +455,7 @@ class EditHabitViewModel @Inject constructor(
                     status = state.status,
                     categoryId = state.categoryId,
                 )
+                Timber.d("Подготовлен объект привычки: ${habit.title}")
 
                 val daysOfWeek = state.selectedDaysOfWeek.map { it.value }
 
@@ -378,20 +473,93 @@ class EditHabitViewModel @Inject constructor(
                         PeriodType.MONTH
                     else null
                 )
+                Timber.d("Подготовлен объект частоты привычки: тип=${habitFrequency.type}")
 
+                // Сохраняем привычку и частоту
                 if (isCreationMode) {
                     habitRepository.addHabit(habit)
                     habitRepository.setHabitFrequency(newHabitId, habitFrequency)
-                    _saveResult.value = SaveResult.Success
-                    emitEvent(EditHabitOneTimeEvent.HabitCreated("Habit created successfully"))
+                    Timber.d("Создана новая привычка с ID: $newHabitId")
                 } else {
                     habitRepository.updateHabit(habit)
                     habitRepository.setHabitFrequency(newHabitId, habitFrequency)
-                    _saveResult.value = SaveResult.Success
+                    Timber.d("Обновлена привычка с ID: $newHabitId")
+                }
+
+                // Сохраняем настройки тегов для привычки (если требуется)
+
+                // Обработка уведомлений
+                try {
+                    Timber.d("Начато сохранение уведомлений. reminderEnabled=${state.reminderEnabled}")
+
+                    // Проверяем, есть ли существующие уведомления
+                    val existingNotifications = notificationRepository.getNotificationsForTarget(newHabitId, NotificationTarget.HABIT).first()
+                    Timber.d("Найдено ${existingNotifications.size} существующих уведомлений для привычки")
+
+                    // Удаляем существующие уведомления для привычки
+                    Timber.d("Удаление существующих уведомлений для привычки с ID: $newHabitId")
+                    notificationRepository.deleteNotificationsForTarget(newHabitId, NotificationTarget.HABIT)
+                    Timber.d("Существующие уведомления удалены")
+
+                    // Если включены напоминания, создаем новое уведомление
+                    if (state.reminderEnabled) {
+                        Timber.d("Включено напоминание, создаем новое уведомление")
+
+                        // Форматируем время в строку формата "HH:mm"
+                        val timeStr = state.reminderTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+                        Timber.d("Время напоминания: $timeStr")
+
+                        // Получаем выбранные дни недели или все дни, если ничего не выбрано
+                        val reminderDaysOfWeek = if (state.reminderDays.isNotEmpty()) {
+                            state.reminderDays.map { it.value }
+                        } else {
+                            // Если дни не выбраны, используем все дни недели
+                            (1..7).toList()
+                        }
+                        Timber.d("Дни недели для напоминания: $reminderDaysOfWeek")
+
+                        // Создаем объект уведомления
+                        val notificationId = UUID.randomUUID().toString()
+                        val notification = Notification(
+                            id = notificationId,
+                            targetId = newHabitId,
+                            targetType = NotificationTarget.HABIT,
+                            time = timeStr,
+                            daysOfWeek = reminderDaysOfWeek,
+                            isEnabled = true,
+                            message = "Пора выполнить привычку: ${state.title}"
+                        )
+                        Timber.d("Создан объект уведомления с ID: $notificationId")
+
+                        // Сохраняем уведомление в БД
+                        val savedNotificationId = notificationRepository.addNotification(notification)
+                        Timber.d("Уведомление сохранено в БД с ID: $savedNotificationId")
+
+                        // Проверяем, что уведомление действительно сохранилось
+                        val savedNotifications = notificationRepository.getNotificationsForTarget(newHabitId, NotificationTarget.HABIT).first()
+                        Timber.d("После сохранения найдено ${savedNotifications.size} уведомлений")
+                        for (n in savedNotifications) {
+                            Timber.d("Сохраненное уведомление: id=${n.id}, targetId=${n.targetId}, time=${n.time}, enabled=${n.isEnabled}")
+                        }
+                    } else {
+                        Timber.d("Напоминание отключено, уведомления не создаются")
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Ошибка при сохранении уведомления")
+                    // Не прерываем основной процесс сохранения из-за ошибки с уведомлениями
+                }
+
+                _saveResult.value = SaveResult.Success
+                if (isCreationMode) {
+                    emitEvent(EditHabitOneTimeEvent.HabitCreated("Habit created successfully"))
+                    Timber.d("Привычка успешно создана")
+                } else {
                     emitEvent(EditHabitOneTimeEvent.HabitUpdated("Habit updated successfully"))
+                    Timber.d("Привычка успешно обновлена")
                 }
 
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при сохранении привычки")
                 _saveResult.value = SaveResult.Error("Error saving: ${e.localizedMessage}")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to save habit: ${e.localizedMessage}"))
             }
@@ -406,10 +574,21 @@ class EditHabitViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                Timber.d("Начато удаление привычки с ID: $habitId")
+
+                // Удаляем все уведомления для этой привычки
+                Timber.d("Удаление уведомлений для привычки с ID: $habitId")
+                notificationRepository.deleteNotificationsForTarget(habitId, NotificationTarget.HABIT)
+                Timber.d("Уведомления удалены")
+
+                // Удаляем саму привычку
                 habitRepository.deleteHabit(habitId)
+                Timber.d("Привычка удалена")
+
                 _saveResult.value = SaveResult.Deleted
                 emitEvent(EditHabitOneTimeEvent.HabitDeleted("Habit deleted successfully"))
             } catch (e: Exception) {
+                Timber.e(e, "Ошибка при удалении привычки")
                 _saveResult.value = SaveResult.Error("Error deleting: ${e.localizedMessage}")
                 emitEvent(EditHabitOneTimeEvent.Error("Failed to delete habit: ${e.localizedMessage}"))
             }

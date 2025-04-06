@@ -146,9 +146,9 @@ fun HabitCard(
                     if (target > 0f) (habit.currentStreak.toFloat() / target).coerceIn(0f, 1f)
                     else 0f
                 }
-                else -> if (habit.status.value == 1) 1f else 0f // BINARY
+                else -> if (habit.currentStreak >= 1) 1f else 0f // BINARY - используем currentStreak вместо status
             }
-            
+
             // Анимировать прогресс
             val animatedProgress = animateFloatAsState(
                 targetValue = progress,
@@ -170,10 +170,11 @@ fun HabitCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Текст прогресса
+            // Текст прогресса
             val progressText = when (habit.type.value) {
                 1 -> "${habit.currentStreak}/${habit.targetValue?.toInt() ?: 0} ${habit.unitOfMeasurement ?: ""}"
                 2 -> "${habit.currentStreak} мин"
-                else -> if (habit.status.value == 1) "Выполнено" else "Не выполнено"
+                else -> if (habit.currentStreak >= 1) "Выполнено" else "Не выполнено" // Также используем currentStreak
             }
 
             Text(

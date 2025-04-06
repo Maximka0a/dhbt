@@ -45,7 +45,9 @@ import com.example.dhbt.presentation.navigation.Statistics
 import com.example.dhbt.presentation.navigation.Tasks
 import com.example.dhbt.presentation.theme.DHbtTheme
 import com.example.dhbt.util.LocaleHelper
+import com.example.dhbt.utils.NotificationDebugHelper
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -56,13 +58,18 @@ class MainActivity : ComponentActivity() {
     // Add this flag to prevent multiple recreations
     private var isRecreating = false
 
+    @Inject
+    lateinit var notificationDebugHelper: NotificationDebugHelper
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         installSplashScreen().apply {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
-
+        lifecycleScope.launch {
+            notificationDebugHelper.testNotificationRepository()
+        }
         // Observe UI events from the ViewModel
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {

@@ -12,14 +12,14 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE targetId = :targetId AND targetType = :targetType")
     fun getNotificationsForTarget(targetId: String, targetType: Int): Flow<List<NotificationEntity>>
 
+    @Query("SELECT * FROM notifications WHERE notificationId = :notificationId")
+    suspend fun getNotificationById(notificationId: String): NotificationEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertNotification(notification: NotificationEntity)
+    suspend fun insertNotification(notification: NotificationEntity): Long
 
     @Update
     suspend fun updateNotification(notification: NotificationEntity)
-
-    @Delete
-    suspend fun deleteNotification(notification: NotificationEntity)
 
     @Query("DELETE FROM notifications WHERE notificationId = :notificationId")
     suspend fun deleteNotificationById(notificationId: String)

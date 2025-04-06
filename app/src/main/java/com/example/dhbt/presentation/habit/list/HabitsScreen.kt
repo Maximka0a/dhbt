@@ -787,26 +787,6 @@ private fun ModernHabitListItem(
                     ) {
 
                         Column {
-                            if (habit.type != HabitType.BINARY) {
-                                Text(
-                                    text = when (habit.type) {
-                                        HabitType.QUANTITY -> {
-                                            val current = (progress * (habit.targetValue ?: 1f)).toInt()
-                                            val target = habit.targetValue?.toInt() ?: 0
-                                            "$current/$target ${habit.unitOfMeasurement ?: ""}"
-                                        }
-                                        HabitType.TIME -> {
-                                            val current = (progress * (habit.targetValue ?: 1f)).toInt()
-                                            val target = habit.targetValue?.toInt() ?: 0
-                                            "$current/$target мин"
-                                        }
-                                        else -> ""
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 2.dp)
-                                )
-                            }
                             // Progress bar
                             LinearProgressIndicator(
                                 progress = { progress },
@@ -1777,37 +1757,6 @@ private fun CategoryTabs(
                 onSelected = { onCategorySelected(category.id) }
             )
         }
-    }
-}
-@Composable
-private fun formatDayOfWeek(date: LocalDate): String {
-    return when (date.dayOfWeek.value) {
-        1 -> stringResource(R.string.monday_short)
-        2 -> stringResource(R.string.tuesday_short)
-        3 -> stringResource(R.string.wednesday_short)
-        4 -> stringResource(R.string.thursday_short)
-        5 -> stringResource(R.string.friday_short)
-        6 -> stringResource(R.string.saturday_short)
-        7 -> stringResource(R.string.sunday_short)
-        else -> ""
-    }
-}
-
-@Composable
-private fun getLocalizedMonth(month: Month): String {
-    return when (month) {
-        Month.JANUARY -> stringResource(R.string.january)
-        Month.FEBRUARY -> stringResource(R.string.february)
-        Month.MARCH -> stringResource(R.string.march)
-        Month.APRIL -> stringResource(R.string.april)
-        Month.MAY -> stringResource(R.string.may)
-        Month.JUNE -> stringResource(R.string.june)
-        Month.JULY -> stringResource(R.string.july)
-        Month.AUGUST -> stringResource(R.string.august)
-        Month.SEPTEMBER -> stringResource(R.string.september)
-        Month.OCTOBER -> stringResource(R.string.october)
-        Month.NOVEMBER -> stringResource(R.string.november)
-        Month.DECEMBER -> stringResource(R.string.december)
     }
 }
 

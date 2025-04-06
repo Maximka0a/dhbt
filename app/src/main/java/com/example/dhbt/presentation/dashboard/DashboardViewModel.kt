@@ -52,7 +52,16 @@ class DashboardViewModel @Inject constructor(
         loadData()
         logCurrentDay()
     }
-
+    // Подсчет привычек с любым прогрессом больше 0
+    private fun countHabitsWithAnyProgress(
+        habits: List<Habit>,
+        todayProgresses: Map<String, Float>
+    ): Int {
+        return habits.count { habit ->
+            val todayProgress = todayProgresses[habit.id] ?: 0f
+            todayProgress > 0f
+        }
+    }
     // Логирование текущего дня для отладки
     private fun logCurrentDay() {
         val today = LocalDate.now()
@@ -104,17 +113,15 @@ class DashboardViewModel @Inject constructor(
                         // Создаем копию привычки с актуальным прогрессом на сегодня
                         val todayProgress = todayProgresses[habit.id] ?: 0f
 
-                        // Округляем или обрезаем до целого числа в зависимости от типа привычки
+                        // Преобразуем прогресс в целое число
                         val progressAsInt = when (habit.type.value) {
                             0 -> if (todayProgress >= 1f) 1 else 0 // BINARY: 0 или 1
-                            1 -> todayProgress.toInt() // QUANTITY: количество целых единиц
-                            2 -> todayProgress.toInt() // TIME: количество целых минут
+                            1 -> todayProgress.toInt() // QUANTITY: количество единиц
+                            2 -> todayProgress.toInt() // TIME: минуты
                             else -> 0
                         }
 
-                        // Логируем для отладки преобразование типов
-                        Log.d(TAG, "Привычка ${habit.title}: преобразование прогресса $todayProgress (Float) -> $progressAsInt (Int)")
-
+                        // Здесь происходит подмена! Прогресс за сегодня записывается в поле currentStreak
                         habit.copy(currentStreak = progressAsInt)
                     }
                     // Считаем статистику с актуальным прогрессом
@@ -174,12 +181,19 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // Обновление обработчика инкремента прогресса
+    // В метод onHabitProgressIncrement в DashboardViewModel добавьте:
     fun onHabitProgressIncrement(habitId: String) {
         viewModelScope.launch {
             Log.d(TAG, "Увеличение прогресса привычки $habitId")
             try {
+                // Получим исходный прогресс для сравнения
+                val initialProgress = habitRepository.getHabitProgressForToday(habitId)
+                Log.d(TAG, "Прогресс ДО инкремента: $initialProgress")
+
                 val today = Calendar.getInstance().timeInMillis
+                Log.d(TAG, "Временная метка сегодня: $today")
+
+                // Увеличиваем прогресс
                 habitRepository.incrementHabitProgress(habitId, today)
 
                 // После инкремента получаем актуальный прогресс на сегодня
@@ -249,8 +263,28 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun refresh() {
-        _state.update { it.copy(isRefreshing = true) }
-        loadData()
+        viewModelScope.launch {
+            try {
+                _state.update { it.copy(isRefreshing = true) }
+
+                // Получаем актуальный прогресс привычек
+                val todayProgresses = habitRepository.getAllHabitsProgressForToday()
+                Log.d(TAG, "Обновление данных: получены прогрессы привычек")
+
+                // Запускаем перезагрузку всех данных
+                loadData()
+
+                Log.d(TAG, "Данные успешно обновлены")
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при обновлении данных", e)
+                _state.update {
+                    it.copy(
+                        isRefreshing = false,
+                        error = "Ошибка при обновлении: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 
     // Фильтрация задач на сегодня (включая выполненные)
@@ -330,5 +364,6 @@ data class DashboardState(
     val totalTasks: Int = 0,
     val completedHabits: Int = 0,
     val totalHabits: Int = 0,
-    val userData: UserData? = null
+    val userData: UserData? = null,
+    val habitsWithProgress: Int = 0, // Новое поле - любой прогресс
 )
