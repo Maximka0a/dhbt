@@ -12,12 +12,14 @@ import com.example.dhbt.data.mapper.SubtaskMapper
 import com.example.dhbt.data.mapper.TagMapper
 import com.example.dhbt.data.mapper.TaskMapper
 import com.example.dhbt.data.mapper.TaskRecurrenceMapper
+import com.example.dhbt.domain.model.NotificationTarget
 import com.example.dhbt.domain.model.Subtask
 import com.example.dhbt.domain.model.Tag
 import com.example.dhbt.domain.model.Task
 import com.example.dhbt.domain.model.TaskPriority
 import com.example.dhbt.domain.model.TaskRecurrence
 import com.example.dhbt.domain.model.TaskStatus
+import com.example.dhbt.domain.repository.NotificationRepository
 import com.example.dhbt.domain.repository.TagRepository
 import com.example.dhbt.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
@@ -36,7 +38,8 @@ class TaskRepositoryImpl @Inject constructor(
     private val tagRepository: TagRepository,
     private val taskMapper: TaskMapper,
     private val subtaskMapper: SubtaskMapper,
-    private val taskRecurrenceMapper: TaskRecurrenceMapper
+    private val taskRecurrenceMapper: TaskRecurrenceMapper,
+    private val notificationRepository: NotificationRepository // Add this
 ) : TaskRepository {
 
     override fun getAllTasks(): Flow<List<Task>> {
@@ -268,6 +271,15 @@ class TaskRepositoryImpl @Inject constructor(
         // Создаем entity для вставки
         val taskEntity = taskMapper.mapToEntity(task)
 
+        // Создаем уведомление, если у задачи есть срок выполнения
+        if (task.dueDate != null) {
+            notificationRepository.scheduleTaskNotification(
+                taskId = task.id,
+                dueDate = task.dueDate,
+                dueTime = task.dueTime
+            )
+        }
+
         // Сохраняем задачу и возвращаем созданный ID
         taskDao.insertTask(taskEntity)
 
@@ -295,6 +307,16 @@ class TaskRepositoryImpl @Inject constructor(
             taskRecurrenceDao.insertTaskRecurrence(recurrenceEntity)
         }
 
+        notificationRepository.deleteNotificationsForTarget(task.id, NotificationTarget.TASK)
+
+        if (task.dueDate != null) {
+            notificationRepository.scheduleTaskNotification(
+                taskId = task.id,
+                dueDate = task.dueDate,
+                dueTime = task.dueTime
+            )
+        }
+
         // Обновляем связи с тегами
         taskTagDao.deleteAllTagsForTask(task.id)
         task.tags.forEach { tag ->
@@ -303,6 +325,7 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteTask(taskId: String) {
+        notificationRepository.deleteNotificationsForTarget(taskId, NotificationTarget.TASK)
         taskDao.deleteTaskById(taskId)
         // Каскадное удаление подзадач, повторений и связей с тегами
         // должно происходить автоматически благодаря настройке внешних ключей в Room
@@ -311,6 +334,7 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun completeTask(taskId: String, completionTime: Long) {
         taskDao.updateTaskStatus(taskId, TaskStatus.COMPLETED.value)
         taskDao.updateTaskCompletion(taskId, completionTime)
+        notificationRepository.deleteNotificationsForTarget(taskId, NotificationTarget.TASK)
     }
 
     override fun getSubtasksForTask(taskId: String): Flow<List<Subtask>> {

@@ -12,7 +12,11 @@ class NotificationMapper @Inject constructor() {
 
     fun mapFromEntity(entity: NotificationEntity): Notification {
         val daysOfWeek = entity.daysOfWeek?.let { daysJson ->
-            Json.decodeFromString<List<Int>>(daysJson)
+            try {
+                Json.decodeFromString<List<Int>>(daysJson)
+            } catch (e: Exception) {
+                null
+            }
         }
 
         return Notification(
@@ -23,6 +27,7 @@ class NotificationMapper @Inject constructor() {
             daysOfWeek = daysOfWeek,
             isEnabled = entity.isEnabled,
             message = entity.message,
+            workId = entity.workId,
             repeatInterval = entity.repeatInterval
         )
     }
@@ -40,6 +45,7 @@ class NotificationMapper @Inject constructor() {
             daysOfWeek = daysOfWeekJson,
             isEnabled = domain.isEnabled,
             message = domain.message,
+            workId = domain.workId,
             repeatInterval = domain.repeatInterval
         )
     }

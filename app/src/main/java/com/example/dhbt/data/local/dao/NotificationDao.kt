@@ -12,8 +12,14 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE targetId = :targetId AND targetType = :targetType")
     fun getNotificationsForTarget(targetId: String, targetType: Int): Flow<List<NotificationEntity>>
 
+    @Query("SELECT * FROM notifications WHERE targetType = :targetType")
+    fun getNotificationsByType(targetType: Int): Flow<List<NotificationEntity>>
+
+    @Query("SELECT * FROM notifications WHERE notificationId = :notificationId")
+    suspend fun getNotificationById(notificationId: String): NotificationEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertNotification(notification: NotificationEntity)
+    suspend fun insertNotification(notification: NotificationEntity): Long
 
     @Update
     suspend fun updateNotification(notification: NotificationEntity)
@@ -29,4 +35,7 @@ interface NotificationDao {
 
     @Query("UPDATE notifications SET isEnabled = :isEnabled WHERE notificationId = :notificationId")
     suspend fun updateNotificationStatus(notificationId: String, isEnabled: Boolean)
+
+    @Query("UPDATE notifications SET workId = :workId WHERE notificationId = :notificationId")
+    suspend fun updateWorkId(notificationId: String, workId: String?)
 }

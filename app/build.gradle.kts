@@ -43,6 +43,11 @@ android {
 }
 
 dependencies {
+    //workmanager'
+    implementation (libs.androidx.work.runtime.ktx)
+    implementation (libs.androidx.hilt.work)
+    ksp( libs.androidx.hilt.compiler)
+
     // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

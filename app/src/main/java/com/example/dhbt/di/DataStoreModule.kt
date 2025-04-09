@@ -55,4 +55,20 @@ object DataStoreModule {
     fun providePomodoroPreferencesStore(@ApplicationContext context: Context): DataStore<PomodoroPreferences> {
         return context.pomodoroPreferencesStore
     }
+
+    @Provides
+    @Singleton
+    fun provideDHbtDataStore(
+        @ApplicationContext context: Context,
+        userDataStore: DataStore<UserData>,
+        userPreferencesStore: DataStore<UserPreferences>,
+        pomodoroPreferencesStore: DataStore<PomodoroPreferences>
+    ): com.example.dhbt.data.local.datastore.DHbtDataStore {
+        return com.example.dhbt.data.local.datastore.DHbtDataStore(
+            context,
+            userDataStore,
+            userPreferencesStore,
+            pomodoroPreferencesStore
+        )
+    }
 }

@@ -2,46 +2,34 @@ package com.example.dhbt.data.local.datastore
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.dataStore
 import com.example.dhbt.domain.model.PomodoroPreferences
 import com.example.dhbt.domain.model.UserData
 import com.example.dhbt.domain.model.UserPreferences
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Update to use domain models
-val Context.userDataStore: DataStore<UserData> by dataStore(
-    fileName = "user_data.json",
-    serializer = UserDataSerializer
-)
-
-val Context.userPreferencesStore: DataStore<UserPreferences> by dataStore(
-    fileName = "user_preferences.json",
-    serializer = UserPreferencesSerializer
-)
-
-val Context.pomodoroPreferencesStore: DataStore<PomodoroPreferences> by dataStore(
-    fileName = "pomodoro_preferences.json",
-    serializer = PomodoroPreferencesSerializer
-)
-
 @Singleton
-class DHbtDataStore @Inject constructor(private val context: Context) {
-
-    val userData: Flow<UserData> = context.userDataStore.data
-    val userPreferences: Flow<UserPreferences> = context.userPreferencesStore.data
-    val pomodoroPreferences: Flow<PomodoroPreferences> = context.pomodoroPreferencesStore.data
+class DHbtDataStore @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val userDataStore: DataStore<UserData>,
+    private val userPreferencesStore: DataStore<UserPreferences>,
+    private val pomodoroPreferencesStore: DataStore<PomodoroPreferences>
+) {
+    val userData: Flow<UserData> = userDataStore.data
+    val userPreferences: Flow<UserPreferences> = userPreferencesStore.data
+    val pomodoroPreferences: Flow<PomodoroPreferences> = pomodoroPreferencesStore.data
 
     suspend fun updateUserData(transform: (UserData) -> UserData) {
-        context.userDataStore.updateData(transform)
+        userDataStore.updateData(transform)
     }
 
     suspend fun updateUserPreferences(transform: (UserPreferences) -> UserPreferences) {
-        context.userPreferencesStore.updateData(transform)
+        userPreferencesStore.updateData(transform)
     }
 
     suspend fun updatePomodoroPreferences(transform: (PomodoroPreferences) -> PomodoroPreferences) {
-        context.pomodoroPreferencesStore.updateData(transform)
+        pomodoroPreferencesStore.updateData(transform)
     }
 }
