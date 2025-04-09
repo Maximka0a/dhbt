@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterialApi::class)
+
 package com.example.dhbt.presentation.dashboard
 
 import androidx.compose.animation.AnimatedVisibility
@@ -7,7 +9,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.LocalContentAlpha
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
@@ -17,6 +23,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.dhbt.R
 import com.example.dhbt.presentation.dashboard.components.*
 import kotlinx.coroutines.launch
@@ -43,6 +52,21 @@ fun DashboardScreen(
     // Для эффекта сворачивающегося тулбара
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
+    // Обновление при возвращении на экран - с помощью LifecycleEffect
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Обновляем данные при возвращении на экран
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Обработка ошибок
     LaunchedEffect(state.error) {
         state.error?.let { errorMessage ->
@@ -54,6 +78,12 @@ fun DashboardScreen(
             viewModel.dismissError()
         }
     }
+
+    // Pull-to-refresh состояние
+    val refreshState = rememberPullRefreshState(
+        refreshing = state.isRefreshing,
+        onRefresh = { viewModel.refresh() }
+    )
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -91,6 +121,7 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .pullRefresh(refreshState) // Применяем Pull-to-Refresh к корневому контейнеру
         ) {
             if (state.isLoading) {
                 LoadingState()
@@ -116,21 +147,14 @@ fun DashboardScreen(
                 )
             }
 
-            // Индикация процесса загрузки данных при обновлении
-            AnimatedVisibility(
-                visible = state.isRefreshing,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                LinearProgressIndicator(
-                    progress = {
-                        0.75f // Можно использовать реальное значение прогресса, если оно доступно
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                )
-            }
+            // Индикатор Pull-to-Refresh
+            PullRefreshIndicator(
+                refreshing = state.isRefreshing,
+                state = refreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

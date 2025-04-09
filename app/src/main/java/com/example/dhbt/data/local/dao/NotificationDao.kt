@@ -12,9 +12,6 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE targetId = :targetId AND targetType = :targetType")
     fun getNotificationsForTarget(targetId: String, targetType: Int): Flow<List<NotificationEntity>>
 
-    @Query("SELECT * FROM notifications WHERE targetType = :targetType")
-    fun getNotificationsByType(targetType: Int): Flow<List<NotificationEntity>>
-
     @Query("SELECT * FROM notifications WHERE notificationId = :notificationId")
     suspend fun getNotificationById(notificationId: String): NotificationEntity?
 
@@ -24,9 +21,6 @@ interface NotificationDao {
     @Update
     suspend fun updateNotification(notification: NotificationEntity)
 
-    @Delete
-    suspend fun deleteNotification(notification: NotificationEntity)
-
     @Query("DELETE FROM notifications WHERE notificationId = :notificationId")
     suspend fun deleteNotificationById(notificationId: String)
 
@@ -35,7 +29,4 @@ interface NotificationDao {
 
     @Query("UPDATE notifications SET isEnabled = :isEnabled WHERE notificationId = :notificationId")
     suspend fun updateNotificationStatus(notificationId: String, isEnabled: Boolean)
-
-    @Query("UPDATE notifications SET workId = :workId WHERE notificationId = :notificationId")
-    suspend fun updateWorkId(notificationId: String, workId: String?)
 }
