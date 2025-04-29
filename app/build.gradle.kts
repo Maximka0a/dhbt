@@ -108,16 +108,25 @@ dependencies {
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.lottie.compose)
     implementation(libs.coil.compose)  // Image loading
-
+    implementation(libs.androidx.animation)
     // Logging
     implementation(libs.timber)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation (libs.mockito.core)
+    testImplementation (libs.mockito.inline)
+    testImplementation (libs.kotlinx.coroutines.test)
+    testImplementation (libs.androidx.core.testing)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.core.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-
-    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.30.1")
+    testImplementation(libs.mockito.kotlin)
+    implementation (libs.accompanist.systemuicontroller)
+    testImplementation(kotlin("test"))
+    androidTestImplementation(libs.androidx.core)
+    androidTestImplementation(libs.androidx.runner)
 }

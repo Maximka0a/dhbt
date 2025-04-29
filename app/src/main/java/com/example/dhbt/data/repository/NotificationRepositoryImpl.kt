@@ -1,11 +1,13 @@
 package com.example.dhbt.data.repository
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.util.Log
-import androidx.work.*
+import androidx.work.Data
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.dhbt.data.local.dao.NotificationDao
 import com.example.dhbt.data.local.dao.TaskDao
 import com.example.dhbt.data.local.datastore.DHbtDataStore
@@ -13,17 +15,18 @@ import com.example.dhbt.data.mapper.NotificationMapper
 import com.example.dhbt.domain.model.Notification
 import com.example.dhbt.domain.model.NotificationTarget
 import com.example.dhbt.domain.repository.NotificationRepository
-import com.example.dhbt.utils.notification.NotificationReceiver
 import com.example.dhbt.utils.notification.NotificationWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.*
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -60,19 +63,34 @@ class NotificationRepositoryImpl @Inject constructor(
         return notificationMapper.mapFromEntity(entity)
     }
 
+    override suspend fun rescheduleAllNotifications() {
+        workManager.cancelAllWorkByTag("notification")
+        val notifications = notificationDao.getAllNotifications().first()
+
+        notifications.forEach { entity ->
+            if (entity.isEnabled) {
+                val notification = notificationMapper.mapFromEntity(entity)
+                notificationDao.updateWorkId(notification.id, null)
+                scheduleNotification(notification)
+            }
+        }
+    }
+
     override suspend fun addNotification(notification: Notification): String {
         try {
             val entity = notificationMapper.mapToEntity(notification)
             notificationDao.insertNotification(entity)
 
             if (notification.isEnabled) {
-                scheduleNotification(notification)
+                val savedEntity = notificationDao.getNotificationById(notification.id)
+                if (savedEntity != null) {
+                    val savedNotification = notificationMapper.mapFromEntity(savedEntity)
+                    scheduleNotification(savedNotification)
+                }
             }
 
             return notification.id
         } catch (e: Exception) {
-            Log.e("NotificationRepository", "Error adding notification: ${e.message}")
-            // Consider whether to rethrow or handle gracefully
             throw e
         }
     }
@@ -81,7 +99,6 @@ class NotificationRepositoryImpl @Inject constructor(
         val entity = notificationMapper.mapToEntity(notification)
         notificationDao.updateNotification(entity)
 
-        // Отмена и перепланирование уведомления
         notification.workId?.let {
             workManager.cancelWorkById(UUID.fromString(it))
         }
@@ -115,6 +132,14 @@ class NotificationRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun scheduleExistingNotification(notification: Notification) {
+        when (notification.targetType) {
+            NotificationTarget.TASK -> scheduleTaskNotificationInternal(notification)
+            NotificationTarget.HABIT -> {} // scheduleHabitNotificationInternal(notification)
+            NotificationTarget.SYSTEM -> scheduleSystemNotificationInternal(notification)
+        }
+    }
+
     override suspend fun deleteNotificationsForTarget(targetId: String, targetType: NotificationTarget) {
         val notifications = notificationDao.getNotificationsForTarget(targetId, targetType.value).first()
         notifications.forEach {
@@ -129,27 +154,56 @@ class NotificationRepositoryImpl @Inject constructor(
     override suspend fun scheduleNotification(notification: Notification) {
         when (notification.targetType) {
             NotificationTarget.TASK -> scheduleTaskNotificationInternal(notification)
-            NotificationTarget.HABIT -> scheduleHabitNotificationInternal(notification)
+            NotificationTarget.HABIT -> {} // scheduleHabitNotificationInternal(notification)
             NotificationTarget.SYSTEM -> scheduleSystemNotificationInternal(notification)
         }
     }
 
     override suspend fun scheduleTaskNotification(taskId: String, dueDate: Long, dueTime: String?) {
-        val userPreferences = dataStore.userPreferences.first()
-        val reminderMinutes = userPreferences.reminderTimeBeforeTask
-
-        // Try to get the task, but don't exit if not found
         val taskEntity = taskDao.getTaskById(taskId)
         val taskTitle = taskEntity?.title ?: "Задача"
 
         val notification = Notification(
             targetId = taskId,
             targetType = NotificationTarget.TASK,
-            time = dueTime ?: "09:00", // Default time if not specified
-            message = "Задача: $taskTitle"
+            time = dueTime ?: "09:00",
+            message = "Задача: $taskTitle",
+            isEnabled = true
         )
 
-        addNotification(notification)
+        val entity = notificationMapper.mapToEntity(notification)
+        notificationDao.insertNotification(entity)
+
+        val data = Data.Builder()
+            .putString("notificationId", notification.id)
+            .putString("targetId", notification.targetId)
+            .putInt("targetType", notification.targetType.value)
+            .putString("message", notification.message ?: "Задача: $taskTitle")
+            .build()
+
+        val delay = calculateDelayForTask(dueDate, dueTime, System.currentTimeMillis())
+        val notificationTag = "notification_task_${notification.id}"
+
+        val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+            .setInputData(data)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .addTag("notification")
+            .addTag("task_notification")
+            .addTag(notificationTag)
+            .build()
+
+        try {
+            workManager.enqueueUniqueWork(
+                notificationTag,
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+
+            val workId = workRequest.id.toString()
+            notificationDao.updateWorkId(notification.id, workId)
+        } catch (e: Exception) {
+            // Ошибки логируются, но не прерывают выполнение
+        }
     }
 
     override suspend fun scheduleHabitNotification(habitId: String, time: String, daysOfWeek: List<Int>) {
@@ -201,87 +255,49 @@ class NotificationRepositoryImpl @Inject constructor(
         notificationDao.updateWorkId(notificationId, null)
     }
 
-    // Внутренние методы для планирования уведомлений
-
     private suspend fun scheduleTaskNotificationInternal(notification: Notification) {
-        val taskEntity = taskDao.getTaskById(notification.targetId) ?: return
-        val dueDate = taskEntity.dueDate ?: return
+        try {
+            val taskEntity = taskDao.getTaskById(notification.targetId)
+            val taskTitle = taskEntity?.title ?: "Задача"
+            val taskDueDate = taskEntity?.dueDate
+            val taskDueTime = taskEntity?.dueTime
 
-        val notificationTime = if (taskEntity.dueTime != null) {
-            LocalTime.parse(taskEntity.dueTime, DateTimeFormatter.ofPattern("HH:mm"))
-        } else {
-            LocalTime.parse(notification.time, DateTimeFormatter.ofPattern("HH:mm"))
-        }
-
-        val dueDateTime = LocalDate.ofEpochDay(dueDate / (24 * 60 * 60 * 1000))
-            .atTime(notificationTime)
-            .atZone(ZoneId.systemDefault())
-
-        val currentTime = System.currentTimeMillis()
-        val notificationTimeMillis = dueDateTime.toInstant().toEpochMilli()
-
-        // Если время уведомления уже прошло, не планируем
-        if (notificationTimeMillis <= currentTime) {
-            return
-        }
-
-        val delay = notificationTimeMillis - currentTime
-
-        val data = Data.Builder()
-            .putString("notificationId", notification.id)
-            .putString("targetId", notification.targetId)
-            .putInt("targetType", notification.targetType.value)
-            .putString("message", notification.message ?: "Задача: ${taskEntity.title}")
-            .build()
-
-        val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
-            .setInputData(data)
-            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .build()
-
-        workManager.enqueue(workRequest)
-
-        // Сохраняем идентификатор работы
-        notificationDao.updateWorkId(notification.id, workRequest.id.toString())
-    }
-
-    private suspend fun scheduleHabitNotificationInternal(notification: Notification) {
-        val daysOfWeek = notification.daysOfWeek ?: listOf()
-        val notificationTime = LocalTime.parse(notification.time, DateTimeFormatter.ofPattern("HH:mm"))
-
-        // Создаем отдельный WorkRequest для каждого дня недели
-        for (dayOfWeek in daysOfWeek) {
             val data = Data.Builder()
                 .putString("notificationId", notification.id)
                 .putString("targetId", notification.targetId)
                 .putInt("targetType", notification.targetType.value)
-                .putString("message", notification.message ?: "Напоминание о привычке")
-                .putInt("dayOfWeek", dayOfWeek)
+                .putString("message", notification.message ?: "Задача: $taskTitle")
                 .build()
 
-            // Создаем периодический запрос работы для каждого дня недели
-            val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(7, TimeUnit.DAYS)
+            val dueTime = taskDueTime ?: notification.time
+            val dueDate = taskDueDate
+                ?: (System.currentTimeMillis() + 24 * 60 * 60 * 1000) // По умолчанию +1 день
+            val delay = calculateDelayForTask(dueDate, dueTime, System.currentTimeMillis())
+            val notificationTag = "notification_task_${notification.id}"
+
+            val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
                 .setInputData(data)
-                .addTag("habit_${notification.targetId}_$dayOfWeek")
-                .setInitialDelay(calculateInitialDelayForDay(dayOfWeek, notificationTime), TimeUnit.MILLISECONDS)
+                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                .addTag("notification")
+                .addTag("task_notification")
+                .addTag(notificationTag)
                 .build()
 
-            workManager.enqueueUniquePeriodicWork(
-                "habit_${notification.id}_$dayOfWeek",
-                ExistingPeriodicWorkPolicy.REPLACE,
+            workManager.enqueueUniqueWork(
+                notificationTag,
+                ExistingWorkPolicy.REPLACE,
                 workRequest
             )
-        }
 
-        // Сохраняем идентификатор работы (первый день как основной)
-        if (daysOfWeek.isNotEmpty()) {
-            notificationDao.updateWorkId(notification.id, "habit_${notification.id}_${daysOfWeek.first()}")
+            val workId = workRequest.id.toString()
+            notificationDao.updateWorkId(notification.id, workId)
+        } catch (e: Exception) {
+            // Ошибки логируются, но не прерывают выполнение
         }
     }
 
     private suspend fun scheduleSystemNotificationInternal(notification: Notification) {
         val notificationTime = LocalTime.parse(notification.time, DateTimeFormatter.ofPattern("HH:mm"))
-
         val initialDelay = calculateInitialDelayForTime(notificationTime)
 
         val data = Data.Builder()
@@ -292,18 +308,20 @@ class NotificationRepositoryImpl @Inject constructor(
             .build()
 
         val workRequest = if (notification.repeatInterval != null) {
-            // Периодическое уведомление
             PeriodicWorkRequestBuilder<NotificationWorker>(
                 notification.repeatInterval.toLong(), TimeUnit.MINUTES
             )
                 .setInputData(data)
                 .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .addTag("notification")
+                .addTag("system_notification")
                 .build()
         } else {
-            // Одноразовое уведомление
             OneTimeWorkRequestBuilder<NotificationWorker>()
                 .setInputData(data)
                 .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .addTag("notification")
+                .addTag("system_notification")
                 .build()
         }
 
@@ -317,11 +335,8 @@ class NotificationRepositoryImpl @Inject constructor(
             workManager.enqueue(workRequest)
         }
 
-        // Сохраняем идентификатор работы
         notificationDao.updateWorkId(notification.id, workRequest.id.toString())
     }
-
-    // Вспомогательные методы для расчета задержки
 
     private fun calculateInitialDelayForDay(dayOfWeek: Int, time: LocalTime): Long {
         val now = LocalDate.now().atTime(LocalTime.now())
@@ -350,5 +365,49 @@ class NotificationRepositoryImpl @Inject constructor(
 
         return targetDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() -
                 now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    private fun calculateDelayForTask(dueDate: Long?, dueTimeString: String?, currentTime: Long): Long {
+        if (dueDate == null) {
+            return 60000L // 1 минута по умолчанию
+        }
+
+        try {
+            val dueDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(dueDate),
+                ZoneId.systemDefault()
+            )
+
+            val timeToSet = if (!dueTimeString.isNullOrEmpty()) {
+                try {
+                    val time = LocalTime.parse(dueTimeString, DateTimeFormatter.ofPattern("HH:mm"))
+                    dueDateTime
+                        .withHour(time.hour)
+                        .withMinute(time.minute)
+                        .withSecond(0)
+                } catch (e: Exception) {
+                    dueDateTime.withHour(9).withMinute(0).withSecond(0)
+                }
+            } else {
+                dueDateTime.withHour(9).withMinute(0).withSecond(0)
+            }
+
+            val dueDateMillis = timeToSet.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            var delay = dueDateMillis - currentTime
+
+            // Минимальная задержка в 1 минуту
+            if (delay <= 0) {
+                delay = 60000L
+            }
+
+            // Максимальная задержка в 7 дней
+            if (delay > 7 * 24 * 60 * 60 * 1000L) {
+                delay = 7 * 24 * 60 * 60 * 1000L
+            }
+
+            return delay
+        } catch (e: Exception) {
+            return 60000L // 1 минута при ошибке
+        }
     }
 }

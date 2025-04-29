@@ -35,17 +35,11 @@ class NotificationReceiver : BroadcastReceiver() {
         val targetType = intent.getIntExtra("targetType", 0)
         val message = intent.getStringExtra("message") ?: "Напоминание"
 
-        // Используем корутину для выполнения асинхронных операций
         CoroutineScope(Dispatchers.IO).launch {
-            // Проверяем, существует ли уведомление в базе
             val notification = notificationRepository.getNotificationById(notificationId)
             if (notification != null) {
-                // Проверка системных настроек и условий показа уведомления
-
-                // Показываем уведомление
                 showNotification(context, targetId, targetType, message)
 
-                // Для одноразовых уведомлений удаляем из базы
                 if (targetType == NotificationTarget.TASK.value) {
                     notificationRepository.deleteNotification(notificationId)
                 }
@@ -56,41 +50,14 @@ class NotificationReceiver : BroadcastReceiver() {
     private fun showNotification(context: Context, targetId: String, targetType: Int, message: String) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Создаем канал для уведомлений (требуется для Android 8.0+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            notificationManager.createNotificationChannel(channel)
-        }
+        createNotificationChannelIfNeeded(context, notificationManager)
 
-        // Создаем интент для открытия приложения при нажатии
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("targetId", targetId)
-            putExtra("targetType", targetType)
-        }
+        val pendingIntent = createPendingIntent(context, targetId, targetType)
 
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val title = getTitleForNotificationType(targetType)
 
-        // Определяем иконку и заголовок в зависимости от типа уведомления
-        val icon = R.drawable.ic_notification // Замените на вашу иконку
-        val title = when (NotificationTarget.fromInt(targetType)) {
-            NotificationTarget.TASK -> "Задача"
-            NotificationTarget.HABIT -> "Привычка"
-            NotificationTarget.SYSTEM -> "DHbt"
-        }
-
-        // Создаем уведомление
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(icon)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
@@ -100,8 +67,41 @@ class NotificationReceiver : BroadcastReceiver() {
             .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .build()
 
-        // Показываем уведомление
         val uniqueId = System.currentTimeMillis().toInt()
         notificationManager.notify(uniqueId, notification)
+    }
+
+    private fun createNotificationChannelIfNeeded(context: Context, notificationManager: NotificationManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createPendingIntent(context: Context, targetId: String, targetType: Int): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("targetId", targetId)
+            putExtra("targetType", targetType)
+        }
+
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun getTitleForNotificationType(targetType: Int): String {
+        return when (NotificationTarget.fromInt(targetType)) {
+            NotificationTarget.TASK -> "Задача"
+            NotificationTarget.HABIT -> "Привычка"
+            NotificationTarget.SYSTEM -> "DHbt"
+        }
     }
 }

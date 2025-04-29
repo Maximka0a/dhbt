@@ -4,6 +4,7 @@ package com.example.dhbt.presentation.habit.list
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -135,6 +136,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.Month
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
     ExperimentalAnimationApi::class)
@@ -503,7 +505,7 @@ private fun OptimizedHabitListView(
                     onIncrement = { onIncrement(habit.id) },
                     onDecrement = { onDecrement(habit.id) },
                     onClick = { onHabitClick(habit.id) },
-                    modifier = Modifier.animateItemPlacement()
+                    modifier = Modifier.animateContentSize()
                 )
             }
         }
@@ -550,7 +552,7 @@ private fun OptimizedHabitGridView(
                     color = habitColor,
                     onToggleCompletion = { onToggleCompletion(habit.id) },
                     onClick = { onHabitClick(habit.id) },
-                    modifier = Modifier.animateItemPlacement()
+                    modifier = Modifier.animateContentSize()
                 )
             }
         }
@@ -623,7 +625,7 @@ private fun OptimizedHabitCategoriesView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
-                            .animateItemPlacement()
+                            .animateContentSize()
                     ) {
                         Box(
                             modifier = Modifier
@@ -683,7 +685,7 @@ private fun OptimizedHabitCategoriesView(
                             onClick = { onHabitClick(habit.id) },
                             showControls = false,
                             modifier = Modifier
-                                .animateItemPlacement()
+                                .animateContentSize()
                                 .padding(start = 20.dp) // Indentation to show hierarchy
                         )
                     }

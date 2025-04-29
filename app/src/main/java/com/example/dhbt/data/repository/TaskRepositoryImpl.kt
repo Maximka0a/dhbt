@@ -4,12 +4,8 @@ import com.example.dhbt.data.local.dao.SubtaskDao
 import com.example.dhbt.data.local.dao.TaskDao
 import com.example.dhbt.data.local.dao.TaskRecurrenceDao
 import com.example.dhbt.data.local.dao.TaskTagDao
-import com.example.dhbt.data.local.entity.SubtaskEntity
-import com.example.dhbt.data.local.entity.TaskEntity
-import com.example.dhbt.data.local.entity.TaskRecurrenceEntity
 import com.example.dhbt.data.local.entity.TaskTagCrossRef
 import com.example.dhbt.data.mapper.SubtaskMapper
-import com.example.dhbt.data.mapper.TagMapper
 import com.example.dhbt.data.mapper.TaskMapper
 import com.example.dhbt.data.mapper.TaskRecurrenceMapper
 import com.example.dhbt.domain.model.NotificationTarget
@@ -23,14 +19,13 @@ import com.example.dhbt.domain.repository.NotificationRepository
 import com.example.dhbt.domain.repository.TagRepository
 import com.example.dhbt.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.forEach
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 
-class TaskRepositoryImpl @Inject constructor(
+open class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao,
     private val subtaskDao: SubtaskDao,
     private val taskRecurrenceDao: TaskRecurrenceDao,
@@ -265,62 +260,64 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addTask(task: Task): String {
-        // Генерируем идентификатор для задачи, если он не был предоставлен
-        val taskId = task.id
-
         // Создаем entity для вставки
         val taskEntity = taskMapper.mapToEntity(task)
 
-        // Создаем уведомление, если у задачи есть срок выполнения
-        if (task.dueDate != null) {
-            notificationRepository.scheduleTaskNotification(
-                taskId = task.id,
-                dueDate = task.dueDate,
-                dueTime = task.dueTime
-            )
-        }
-
-        // Сохраняем задачу и возвращаем созданный ID
+        // Сохраняем задачу в БД
         taskDao.insertTask(taskEntity)
 
-        // Возвращаем исходный ID задачи
-        return taskId
+        // Создаем уведомление, если у задачи есть срок выполнения
+        if (task.dueDate != null) {
+            try {
+                notificationRepository.scheduleTaskNotification(
+                    taskId = task.id,
+                    dueDate = task.dueDate,
+                    dueTime = task.dueTime
+                )
+            } catch (e: Exception) {
+                // Проглатываем исключение - не прерываем создание задачи из-за уведомления
+            }
+        }
+
+        return task.id
     }
 
     override suspend fun updateTask(task: Task) {
+        // Обновляем основные данные задачи
         val taskEntity = taskMapper.mapToEntity(task)
         taskDao.updateTask(taskEntity)
 
         // Обновляем подзадачи
-        // Сначала удаляем существующие подзадачи
         subtaskDao.deleteSubtasksForTask(task.id)
-        // Затем добавляем обновленные подзадачи
         task.subtasks.forEach { subtask ->
-            val subtaskEntity = subtaskMapper.mapToEntity(subtask)
-            subtaskDao.insertSubtask(subtaskEntity)
+            subtaskDao.insertSubtask(subtaskMapper.mapToEntity(subtask))
         }
 
         // Обновляем повторение задачи
         taskRecurrenceDao.deleteRecurrenceForTask(task.id)
         task.recurrence?.let { recurrence ->
-            val recurrenceEntity = taskRecurrenceMapper.mapToEntity(recurrence)
-            taskRecurrenceDao.insertTaskRecurrence(recurrenceEntity)
-        }
-
-        notificationRepository.deleteNotificationsForTarget(task.id, NotificationTarget.TASK)
-
-        if (task.dueDate != null) {
-            notificationRepository.scheduleTaskNotification(
-                taskId = task.id,
-                dueDate = task.dueDate,
-                dueTime = task.dueTime
-            )
+            taskRecurrenceDao.insertTaskRecurrence(taskRecurrenceMapper.mapToEntity(recurrence))
         }
 
         // Обновляем связи с тегами
         taskTagDao.deleteAllTagsForTask(task.id)
         task.tags.forEach { tag ->
             taskTagDao.insertTaskTagCrossRef(TaskTagCrossRef(task.id, tag.id))
+        }
+
+        // Обновляем уведомления
+        try {
+            notificationRepository.deleteNotificationsForTarget(task.id, NotificationTarget.TASK)
+
+            if (task.dueDate != null) {
+                notificationRepository.scheduleTaskNotification(
+                    taskId = task.id,
+                    dueDate = task.dueDate,
+                    dueTime = task.dueTime
+                )
+            }
+        } catch (e: Exception) {
+            // Проглатываем исключение - не прерываем обновление задачи из-за уведомления
         }
     }
 

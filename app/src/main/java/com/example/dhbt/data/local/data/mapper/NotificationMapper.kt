@@ -1,10 +1,9 @@
 package com.example.dhbt.data.mapper
 
+import android.util.Log
 import com.example.dhbt.data.local.entity.NotificationEntity
 import com.example.dhbt.domain.model.Notification
 import com.example.dhbt.domain.model.NotificationTarget
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
@@ -33,20 +32,18 @@ class NotificationMapper @Inject constructor() {
     }
 
     fun mapToEntity(domain: Notification): NotificationEntity {
-        val daysOfWeekJson = domain.daysOfWeek?.let { days ->
-            Json.encodeToString(days)
-        }
-
-        return NotificationEntity(
+        val entity = NotificationEntity(
             notificationId = domain.id,
             targetId = domain.targetId,
             targetType = domain.targetType.value,
             time = domain.time,
-            daysOfWeek = daysOfWeekJson,
+            daysOfWeek = domain.daysOfWeek?.let { Json.encodeToString(it) },
             isEnabled = domain.isEnabled,
             message = domain.message,
             workId = domain.workId,
             repeatInterval = domain.repeatInterval
         )
+        Log.d("NotificationMapper", "Mapped to entity: ${entity.notificationId}, workId=${entity.workId}")
+        return entity
     }
 }

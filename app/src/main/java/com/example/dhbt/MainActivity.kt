@@ -11,7 +11,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -45,9 +50,7 @@ import com.example.dhbt.presentation.navigation.Statistics
 import com.example.dhbt.presentation.navigation.Tasks
 import com.example.dhbt.presentation.theme.DHbtTheme
 import com.example.dhbt.util.LocaleHelper
-import com.example.dhbt.utils.NotificationDebugHelper
 import dagger.hilt.android.AndroidEntryPoint
-import jakarta.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -55,21 +58,16 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var currentLanguage: String = "ru"
-    // Add this flag to prevent multiple recreations
     private var isRecreating = false
-
-    @Inject
-    lateinit var notificationDebugHelper: NotificationDebugHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
         installSplashScreen().apply {
             setKeepOnScreenCondition { viewModel.state.value.isLoading }
         }
-        lifecycleScope.launch {
-            notificationDebugHelper.testNotificationRepository()
-        }
+
         // Observe UI events from the ViewModel
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -77,11 +75,10 @@ class MainActivity : ComponentActivity() {
                     when (event) {
                         is MainEvent.ApplyLanguage -> {
                             if (currentLanguage != event.language && !isRecreating) {
-                                isRecreating = true // Prevent multiple recreations
+                                isRecreating = true
                                 currentLanguage = event.language
                                 updateLocale(event.language)
 
-                                // Use a handler with a slight delay to ensure smooth transition
                                 Handler(Looper.getMainLooper()).postDelayed({
                                     recreate()
                                 }, 100)
@@ -93,9 +90,7 @@ class MainActivity : ComponentActivity() {
                                 recreate()
                             }
                         }
-                        else -> {
-                            // Handle other events
-                        }
+                        else -> { /* Ignore other events */ }
                     }
                 }
             }
@@ -108,7 +103,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Reset the recreation flag when activity is fully resumed
         isRecreating = false
     }
 
@@ -117,7 +111,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        // Get the language code from somewhere - here using preferences directly
         val sharedPrefs = newBase.getSharedPreferences("user_preferences", Context.MODE_PRIVATE)
         val languageCode = sharedPrefs.getString("language", "ru") ?: "ru"
         currentLanguage = languageCode
@@ -131,7 +124,6 @@ class MainActivity : ComponentActivity() {
 fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
     val uiState by viewModel.state.collectAsState()
     val context = LocalContext.current
-    // Track if we've handled the language change
     val languageChangeHandled = remember { mutableStateOf(false) }
 
     // Apply language changes only once when app starts or changes
@@ -155,7 +147,6 @@ fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
         val startDestination = if (!uiState.hasCompletedOnboarding) {
             Onboarding
         } else {
-            // Use the selected start screen from preferences
             when (uiState.startScreen) {
                 StartScreen.DASHBOARD -> Dashboard
                 StartScreen.TASKS -> Tasks
@@ -178,17 +169,13 @@ fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
         )
 
         val showBottomNav = currentRoute in mainRoutes
-
-        // Вычисляем нужную высоту для отступа
         val bottomNavHeight = 80.dp
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Основной контент
+            // Main content
             Box(
                 modifier = Modifier
-                    // Используем imePadding для правильной работы с клавиатурой
                     .imePadding()
-                    // Условный отступ только когда нужно
                     .then(
                         if (showBottomNav) {
                             Modifier.padding(bottom = bottomNavHeight)
@@ -206,7 +193,7 @@ fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
                 )
             }
 
-            // Нижняя навигация
+            // Bottom navigation
             AnimatedVisibility(
                 visible = showBottomNav,
                 enter = slideInVertically(initialOffsetY = { it }),
@@ -218,7 +205,7 @@ fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
                     shadowElevation = 8.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding() // Учитываем системную навигацию
+                        .navigationBarsPadding()
                 ) {
                     DHbtBottomNavigation(navController)
                 }

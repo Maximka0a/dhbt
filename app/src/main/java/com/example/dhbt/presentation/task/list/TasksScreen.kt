@@ -1,6 +1,7 @@
 package com.example.dhbt.presentation.task.list
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -1010,7 +1011,7 @@ fun TasksList(
                             onTaskToggle(task.id)
                         },
                         onDeleteTask = { onTaskDelete(task.id) },
-                        modifier = Modifier.animateItemPlacement()
+                        modifier = Modifier.animateContentSize()
                     )
                 }
             }
@@ -1048,7 +1049,7 @@ fun TasksList(
                             onTaskToggle(task.id)
                         },
                         onDeleteTask = { onTaskDelete(task.id) },
-                        modifier = Modifier.animateItemPlacement()
+                        modifier = Modifier.animateContentSize()
                     )
                 }
             }

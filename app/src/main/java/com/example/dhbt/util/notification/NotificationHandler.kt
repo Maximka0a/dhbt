@@ -14,6 +14,8 @@ import com.example.dhbt.domain.model.NotificationTarget
 import com.example.dhbt.presentation.MainActivity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +43,44 @@ class NotificationHandler @Inject constructor(
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         // Создаем канал для уведомлений (требуется для Android 8.0+)
+        createNotificationChannelIfNeeded(notificationManager)
+
+        // Создаем интент для открытия приложения при нажатии
+        val pendingIntent = createPendingIntent(targetId, targetType)
+
+        // Получаем пользовательские настройки
+        val userPreferences = dataStore.userPreferences.first()
+
+        // Создаем уведомление с учетом настроек
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .apply {
+                // Добавляем звук в зависимости от настроек
+                if (userPreferences.defaultSoundEnabled) {
+                    setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                }
+
+                // Добавляем вибрацию в зависимости от настроек
+                if (userPreferences.defaultVibrationEnabled) {
+                    setVibrate(longArrayOf(0, 250, 250, 250))
+                }
+            }
+            .build()
+
+        // Генерируем уникальный ID для уведомления
+        val uniqueId = generateUniqueId(targetId, targetType)
+
+        // Показываем уведомление
+        notificationManager.notify(uniqueId, notification)
+    }
+
+    private fun createNotificationChannelIfNeeded(notificationManager: NotificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -49,53 +89,29 @@ class NotificationHandler @Inject constructor(
             )
             notificationManager.createNotificationChannel(channel)
         }
+    }
 
-        // Создаем интент для открытия приложения при нажатии
+    private fun createPendingIntent(targetId: String, targetType: Int): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("targetId", targetId)
             putExtra("targetType", targetType)
         }
 
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             context,
             0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
 
-        // Определяем иконку в зависимости от типа уведомления
-        val icon = R.drawable.ic_notification // Замените на вашу иконку
-
-        // Создаем уведомление
-        val userPreferences = dataStore.userPreferences.first()
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(icon)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-
-        // Добавляем звук в зависимости от настроек
-        if (userPreferences.defaultSoundEnabled) {
-            notification.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-        }
-
-        // Добавляем вибрацию в зависимости от настроек
-        if (userPreferences.defaultVibrationEnabled) {
-            notification.setVibrate(longArrayOf(0, 250, 250, 250))
-        }
-
-        // Показываем уведомление
-        val uniqueId = when (NotificationTarget.fromInt(targetType)) {
+    private fun generateUniqueId(targetId: String, targetType: Int): Int {
+        return when (NotificationTarget.fromInt(targetType)) {
             NotificationTarget.TASK -> targetId.hashCode()
             NotificationTarget.HABIT -> (targetId + System.currentTimeMillis()).hashCode()
             NotificationTarget.SYSTEM -> targetId.hashCode()
         }
-
-        notificationManager.notify(uniqueId, notification.build())
     }
 
     private suspend fun shouldShowNotification(): Boolean {
@@ -104,12 +120,12 @@ class NotificationHandler @Inject constructor(
 
         // Проверка тихих часов
         if (preferences.quietHoursEnabled) {
-            val now = java.time.LocalTime.now()
+            val now = LocalTime.now()
             val quietStart = preferences.quietHoursStart?.let {
-                java.time.LocalTime.parse(it, java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                tryParseTime(it)
             }
             val quietEnd = preferences.quietHoursEnd?.let {
-                java.time.LocalTime.parse(it, java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                tryParseTime(it)
             }
 
             if (quietStart != null && quietEnd != null) {
@@ -128,15 +144,11 @@ class NotificationHandler @Inject constructor(
         }
 
         // Проверка периода бодрствования
-        val wakeUpTime = userData.wakeUpTime?.let {
-            java.time.LocalTime.parse(it, java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-        }
-        val sleepTime = userData.sleepTime?.let {
-            java.time.LocalTime.parse(it, java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-        }
+        val wakeUpTime = userData.wakeUpTime?.let { tryParseTime(it) }
+        val sleepTime = userData.sleepTime?.let { tryParseTime(it) }
 
         if (wakeUpTime != null && sleepTime != null) {
-            val now = java.time.LocalTime.now()
+            val now = LocalTime.now()
 
             if (wakeUpTime.isBefore(sleepTime)) {
                 // Если период бодрствования в пределах одного дня
@@ -152,5 +164,13 @@ class NotificationHandler @Inject constructor(
         }
 
         return true
+    }
+
+    private fun tryParseTime(timeString: String): LocalTime? {
+        return try {
+            LocalTime.parse(timeString, DateTimeFormatter.ofPattern("HH:mm"))
+        } catch (e: Exception) {
+            null
+        }
     }
 }

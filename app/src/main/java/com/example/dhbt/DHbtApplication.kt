@@ -3,6 +3,7 @@ package com.example.dhbt
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.example.dhbt.domain.repository.NotificationRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,14 +17,18 @@ class DHbtApplication : Application(), Configuration.Provider {
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
-    lateinit var notificationRepository: com.example.dhbt.domain.repository.NotificationRepository
+    lateinit var notificationRepository: NotificationRepository
 
     override fun onCreate() {
         super.onCreate()
 
-        // Инициализация ежедневных системных уведомлений
+        // Инициализация уведомлений
         CoroutineScope(Dispatchers.IO).launch {
+            // Планирование системных уведомлений
             notificationRepository.scheduleSystemDailyNotifications()
+
+            // Перепланирование существующих уведомлений
+            notificationRepository.rescheduleAllNotifications()
         }
     }
 

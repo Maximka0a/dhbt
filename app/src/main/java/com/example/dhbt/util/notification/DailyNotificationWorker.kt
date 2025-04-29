@@ -20,29 +20,24 @@ class DailyNotificationWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val notificationType = inputData.getString("type") ?: return Result.failure()
+        return try {
+            val notificationType = inputData.getString("type") ?: return Result.failure()
 
-        try {
             when (notificationType) {
                 "wakeup" -> sendWakeUpNotification()
                 "sleep" -> sendSleepNotification()
+                else -> return Result.failure()
             }
-            return Result.success()
+
+            Result.success()
         } catch (e: Exception) {
-            return Result.failure()
+            Result.failure()
         }
     }
 
     private suspend fun sendWakeUpNotification() {
-        // Подсчитываем количество активных задач
         val activeTasks = taskDao.getTasksByStatus(TaskStatus.ACTIVE.value).first()
-        val taskCount = activeTasks.size
-
-        val message = if (taskCount > 0) {
-            "У вас $taskCount невыполненных задач. Просыпайтесь и выполняйте их!"
-        } else {
-            "Доброе утро! У вас нет невыполненных задач на сегодня."
-        }
+        val message = createWakeUpMessage(activeTasks.size)
 
         notificationHandler.showNotification(
             targetId = "system_wakeup",
@@ -50,6 +45,14 @@ class DailyNotificationWorker @AssistedInject constructor(
             title = "Доброе утро",
             message = message
         )
+    }
+
+    private fun createWakeUpMessage(taskCount: Int): String {
+        return if (taskCount > 0) {
+            "У вас $taskCount невыполненных задач. Просыпайтесь и выполняйте их!"
+        } else {
+            "Доброе утро! У вас нет невыполненных задач на сегодня."
+        }
     }
 
     private suspend fun sendSleepNotification() {
