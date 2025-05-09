@@ -86,7 +86,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -95,6 +94,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -112,7 +112,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -135,7 +134,7 @@ import com.example.dhbt.presentation.util.parseColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.Month
+
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
@@ -160,7 +159,7 @@ fun HabitsScreen(
     var areCategoriesVisible by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 
-    // Animation values - use derivedStateOf to avoid unnecessary animations
+    // Animation values
     val animatedProgress by animateFloatAsState(
         targetValue = overallProgress,
         animationSpec = spring(
@@ -177,20 +176,18 @@ fun HabitsScreen(
         }
     }
 
-    // Scroll behavior for the top app bar
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                LargeTopAppBar(
+                // Статический TopAppBar вместо скролящегося LargeTopAppBar
+                TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = stringResource(R.string.habits),
-                                style = MaterialTheme.typography.headlineMedium.copy(
+                                style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold
                                 )
                             )
@@ -269,11 +266,9 @@ fun HabitsScreen(
                             )
                         }
                     },
-                    scrollBehavior = scrollBehavior,
-                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                    colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
@@ -463,6 +458,7 @@ fun HabitsScreen(
         }
     }
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OptimizedHabitListView(
@@ -1800,9 +1796,6 @@ private fun CategoryChip(
     }
 }
 
-
-
-
 @Composable
 private fun EmptyStateView(
     filterState: HabitsFilterState,
@@ -1895,10 +1888,6 @@ private fun countActiveFilters(filterState: HabitsFilterState): Int {
     return count
 }
 
-private fun formatMonthYear(date: LocalDate): String {
-    val month = date.month.toString().lowercase().capitalize()
-    return "$month ${date.year}"
-}
 
 private fun hasCompletedHabitsForDate(date: LocalDate, habits: List<HabitWithProgress>): Boolean {
     return habits.any { it.completedDates.contains(date) }

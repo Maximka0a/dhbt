@@ -1,24 +1,17 @@
 package com.example.dhbt.presentation.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.example.dhbt.presentation.MainViewModel
 import com.example.dhbt.presentation.dashboard.DashboardScreen
 import com.example.dhbt.presentation.eisenhower.EisenhowerScreen
 import com.example.dhbt.presentation.habit.detail.HabitDetailScreen
 import com.example.dhbt.presentation.habit.edit.EditHabitScreen
 import com.example.dhbt.presentation.habit.list.HabitsScreen
+import com.example.dhbt.presentation.onboarding.OnboardingScreen
 import com.example.dhbt.presentation.pomodoro.PomodoroScreen
 import com.example.dhbt.presentation.settings.SettingsScreen
 import com.example.dhbt.presentation.statistics.StatisticsScreen
@@ -31,31 +24,16 @@ import com.example.dhbt.presentation.task.list.TasksScreen
 fun DHbtNavHost(
     navController: NavHostController,
     startDestination: Any = Dashboard,
-    modifier: Modifier = Modifier,
-    mainViewModel: MainViewModel? = null
+    modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController, startDestination = startDestination, modifier = modifier
     ) {
         // Основные экраны
         composable<Onboarding> {
-            Surface(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Экран онбординга")
-                    Button(onClick = {
-                        mainViewModel?.completeOnboarding()
-                        navController.navigate(Dashboard) {
-                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                        }
-                    }) {
-                        Text("Перейти к приложению")
-                    }
-                }
-            }
+            OnboardingScreen(
+                navController = navController
+            )
         }
 
         // Экраны задач

@@ -1,5 +1,6 @@
 package com.example.dhbt.presentation
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
@@ -120,6 +121,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@SuppressLint("LocalContextConfigurationRead")
 @Composable
 fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
     val uiState by viewModel.state.collectAsState()
@@ -188,8 +190,7 @@ fun DHbtApp(viewModel: MainViewModel = hiltViewModel()) {
                 DHbtNavHost(
                     navController = navController,
                     startDestination = startDestination,
-                    modifier = Modifier.fillMaxSize(),
-                    mainViewModel = viewModel
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 

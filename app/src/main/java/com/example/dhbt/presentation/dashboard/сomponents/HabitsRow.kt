@@ -33,12 +33,17 @@ fun HabitsRow(
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Map для хранения состояния анимации для каждой привычки
     val animationStates = remember {
         mutableStateMapOf<String, Boolean>()
     }
-    
+
+    // Map для отслеживания последних обновлений привычек
+    val lastUpdateTimestamp = remember {
+        mutableStateMapOf<String, Long>()
+    }
+
     LazyRow(
         state = lazyListState,
         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -59,7 +64,7 @@ fun HabitsRow(
                     tween(150)
                 }
             )
-            
+
             HabitCard(
                 habit = habit,
                 modifier = Modifier
@@ -72,18 +77,25 @@ fun HabitsRow(
                     .combinedClickable(
                         onClick = { onHabitClick(habit.id) },
                         onLongClick = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            
-                            // Запуск анимации
-                            coroutineScope.launch {
-                                animationStates[habit.id] = true
-                                delay(300) // Длительность анимации
-                                
-                                // Вызов функции инкремента прогресса
-                                onHabitProgressIncrement(habit.id)
-                                
-                                delay(100) // Небольшая задержка перед возвратом к нормальному размеру
-                                animationStates[habit.id] = false
+                            // Предотвращаем слишком частые обновления (дебаунс)
+                            val currentTime = System.currentTimeMillis()
+                            val lastUpdate = lastUpdateTimestamp[habit.id] ?: 0L
+                            if (currentTime - lastUpdate > 1000) { // Минимум 1 секунда между обновлениями
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                // Запуск анимации
+                                coroutineScope.launch {
+                                    animationStates[habit.id] = true
+                                    delay(300) // Длительность анимации
+
+                                    // Вызов функции инкремента прогресса
+                                    onHabitProgressIncrement(habit.id)
+                                    lastUpdateTimestamp[habit.id] = currentTime
+
+                                    // Немного дольше задержка перед завершением анимации
+                                    delay(300)
+                                    animationStates[habit.id] = false
+                                }
                             }
                         }
                     )
@@ -98,7 +110,23 @@ fun HabitCard(
     modifier: Modifier = Modifier
 ) {
     val habitColor = habit.color.toColor(MaterialTheme.colorScheme.primary)
-    
+
+    // Запоминаем последнее значение прогресса для плавной анимации
+    val previousProgress = remember { mutableFloatStateOf(0f) }
+
+    // При изменении habit.currentStreak обновляем previousProgress
+    LaunchedEffect(habit.currentStreak) {
+        val newProgress = when (habit.type.value) {
+            1, 2 -> { // QUANTITY или TIME
+                val target = habit.targetValue ?: 1f
+                if (target > 0f) (habit.currentStreak.toFloat() / target).coerceIn(0f, 1f)
+                else 0f
+            }
+            else -> if (habit.currentStreak >= 1) 1f else 0f
+        }
+        previousProgress.floatValue = newProgress
+    }
+
     ElevatedCard(
         modifier = modifier,
         colors = CardDefaults.elevatedCardColors(
@@ -146,20 +174,21 @@ fun HabitCard(
                     if (target > 0f) (habit.currentStreak.toFloat() / target).coerceIn(0f, 1f)
                     else 0f
                 }
-                else -> if (habit.currentStreak >= 1) 1f else 0f // BINARY - используем currentStreak вместо status
+                else -> if (habit.currentStreak >= 1) 1f else 0f // BINARY
             }
 
-            // Анимировать прогресс
-            val animatedProgress = animateFloatAsState(
+            // Анимировать прогресс с более заметной анимацией
+            val animatedProgress by animateFloatAsState(
                 targetValue = progress,
-                animationSpec = tween(
-                    durationMillis = 700,
-                    easing = FastOutSlowInEasing
-                )
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "Progress"
             )
 
             LinearProgressIndicator(
-                progress = { animatedProgress.value },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp),
@@ -170,11 +199,10 @@ fun HabitCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Текст прогресса
-            // Текст прогресса
             val progressText = when (habit.type.value) {
                 1 -> "${habit.currentStreak}/${habit.targetValue?.toInt() ?: 0} ${habit.unitOfMeasurement ?: ""}"
                 2 -> "${habit.currentStreak} мин"
-                else -> if (habit.currentStreak >= 1) "Выполнено" else "Не выполнено" // Также используем currentStreak
+                else -> if (habit.currentStreak >= 1) "Выполнено" else "Не выполнено"
             }
 
             Text(

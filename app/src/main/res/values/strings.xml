@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- Ошибки -->
+    <string name="error_unknown">Произошла неизвестная ошибка</string>
+    <string name="error_network">Проблема с подключением к сети</string>
+    <string name="error_database">Ошибка базы данных</string>
+    <string name="error_task_update">Не удалось обновить задачу</string>
+    <string name="error_task_delete">Не удалось удалить задачу</string>
+    <string name="error_habit_progress">Не удалось обновить прогресс привычки</string>
+    <string name="error_habit_data">Проблема с данными привычки</string>
+    <string name="error_data_load">Не удалось загрузить данные</string>
+
+    <!-- Действия -->
+    <string name="action_dismiss">Закрыть</string>
+    <string name="action_retry">Повторить</string>
+
     <!-- App Name -->
     <string name="app_name">DHbt</string>
 
