@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+    <!-- Базовая тема приложения -->
     <style name="Theme.Dhbt" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Тема для сплеш-скрина (светлая) -->
+    <style name="App.Starting.Theme" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_icon_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.Dhbt</item>
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

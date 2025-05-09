@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -159,16 +160,21 @@ class SettingsViewModel @Inject constructor(
     private fun updateLanguage(language: String) {
         viewModelScope.launch {
             try {
-                // First update the repository
+                // Добавляем проверку, чтобы не обновлять язык, если он не изменился
+                val currentLanguage = userPreferencesRepository.getUserPreferences().first().language
+                if (currentLanguage == language) {
+                    _successMessage.value = "Язык уже установлен"
+                    return@launch
+                }
+
+                // Сначала обновляем репозиторий
                 userPreferencesRepository.updateLanguage(language)
 
-                // Then emit event (with a slight delay to prevent race conditions)
-                delay(50)
+                // Затем эмитим событие, но только один раз
                 _events.emit(SettingsEvent.LanguageChanged(language))
-
-                // Only show success message after language actually changes
-                delay(200)
+                delay(500)
                 _successMessage.value = "Язык обновлен и применен"
+                // Убираем успешное сообщение, так как переход на новый язык сбросит его
             } catch (e: Exception) {
                 _errorMessage.value = "Не удалось обновить язык: ${e.message}"
                 Log.e("SettingsVM", "Ошибка обновления языка", e)
