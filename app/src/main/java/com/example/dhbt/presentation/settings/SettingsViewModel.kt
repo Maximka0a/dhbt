@@ -1,19 +1,17 @@
 package com.example.dhbt.presentation.settings
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dhbt.domain.model.AppTheme
 import com.example.dhbt.domain.model.Category
-import com.example.dhbt.domain.model.CategoryType
 import com.example.dhbt.domain.model.PomodoroPreferences
-import com.example.dhbt.domain.model.StartScreen
 import com.example.dhbt.domain.model.UserData
 import com.example.dhbt.domain.model.UserPreferences
 import com.example.dhbt.domain.repository.CategoryRepository
 import com.example.dhbt.domain.repository.PomodoroRepository
 import com.example.dhbt.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,13 +19,17 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Locale
+import timber.log.Timber
 import javax.inject.Inject
 
+private const val TAG = "SettingsViewModel"
+
+/**
+ * ViewModel для экрана настроек приложения
+ */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
@@ -35,28 +37,31 @@ class SettingsViewModel @Inject constructor(
     private val pomodoroRepository: PomodoroRepository
 ) : ViewModel() {
 
-    // Состояние UI
+    // Состояние UI с признаком загрузки и ошибками
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
 
-    private val _events = MutableSharedFlow<SettingsEvent>()
+    // События для одноразового оповещения UI
+    private val _events = MutableSharedFlow<SettingsEvent>(extraBufferCapacity = 1)
     val events = _events.asSharedFlow()
 
-    // Потоки данных
+    // Данные пользователя из репозитория с дефолтным значением для быстрой инициализации
     val userData: StateFlow<UserData> = userPreferencesRepository.getUserData()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserData())
 
+    // Настройки пользователя из репозитория
     val userPreferences: StateFlow<UserPreferences> = userPreferencesRepository.getUserPreferences()
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferences())
 
+    // Настройки Pomodoro
     val pomodoroPreferences: StateFlow<PomodoroPreferences> = pomodoroRepository.getPomodoroPreferences()
         .stateIn(viewModelScope, SharingStarted.Eagerly, PomodoroPreferences())
 
+    // Категории для задач и привычек
     val categories: StateFlow<List<Category>> = categoryRepository.getAllCategories()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-
-    // Состояния диалогов
+    // Состояния диалогов - используем однократную переменную для всех
     private val _showDeleteDialog = MutableStateFlow(false)
     val showDeleteDialog = _showDeleteDialog.asStateFlow()
 
@@ -72,19 +77,18 @@ class SettingsViewModel @Inject constructor(
     private val _showQuietHoursDialog = MutableStateFlow(false)
     val showQuietHoursDialog = _showQuietHoursDialog.asStateFlow()
 
-    // Состояние успешных операций
+    // Сообщения об успешных операциях и ошибках
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage = _successMessage.asStateFlow()
 
-    // Состояние ошибок
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
 
-    // Конфигурация для диалогов
+    // Редактируемая категория для диалога
     private val _editCategory = MutableStateFlow<Category?>(null)
     val editCategory = _editCategory.asStateFlow()
 
-    // Доступные языки
+    // Список поддерживаемых языков
     val availableLanguages = listOf(
         LanguageOption("ru", "Русский"),
         LanguageOption("en", "English"),
@@ -97,20 +101,28 @@ class SettingsViewModel @Inject constructor(
         loadSettings()
     }
 
+    /**
+     * Загружает начальные настройки
+     */
     private fun loadSettings() {
         viewModelScope.launch {
             try {
+                Timber.d("Загрузка начальных настроек")
                 _uiState.value = _uiState.value.copy(isLoading = false)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка загрузки настроек")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Ошибка загрузки настроек: ${e.message}"
                 )
-                Log.e("SettingsVM", "Ошибка загрузки настроек", e)
             }
         }
     }
 
+    /**
+     * Обрабатывает действия пользователя на экране настроек
+     */
     fun onAction(action: SettingsAction) {
         when (action) {
             is SettingsAction.UpdateTheme -> updateTheme(action.themeMode)
@@ -144,243 +156,292 @@ class SettingsViewModel @Inject constructor(
             is SettingsAction.DismissError -> _errorMessage.value = null
         }
     }
+
+    /**
+     * Обновляет тему приложения
+     */
     private fun updateTheme(themeMode: Int) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateTheme(themeMode)
-                _successMessage.value = "Тема оформления обновлена"
-                // Theme changes are observed and applied immediately via flow in MainViewModel
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить тему: ${e.message}"
-                Log.e("SettingsVM", "Ошибка обновления темы", e)
+        executeOperation(
+            operation = { userPreferencesRepository.updateTheme(themeMode) },
+            successMessage = "Тема оформления обновлена",
+            errorMessage = "Не удалось обновить тему",
+            onSuccess = {
+                viewModelScope.launch {
+                    _events.emit(SettingsEvent.ThemeChanged(AppTheme.fromInt(themeMode)))
+                }
             }
-        }
+        )
     }
 
+    /**
+     * Обновляет язык приложения
+     */
     private fun updateLanguage(language: String) {
         viewModelScope.launch {
             try {
-                // Добавляем проверку, чтобы не обновлять язык, если он не изменился
+                // Проверка текущего языка для избежания лишних обновлений
                 val currentLanguage = userPreferencesRepository.getUserPreferences().first().language
                 if (currentLanguage == language) {
                     _successMessage.value = "Язык уже установлен"
                     return@launch
                 }
 
-                // Сначала обновляем репозиторий
+                // Обновление настроек и уведомление о смене языка
                 userPreferencesRepository.updateLanguage(language)
-
-                // Затем эмитим событие, но только один раз
                 _events.emit(SettingsEvent.LanguageChanged(language))
-                delay(500)
+
+                // Небольшая задержка перед показом сообщения
+                delay(300)
                 _successMessage.value = "Язык обновлен и применен"
-                // Убираем успешное сообщение, так как переход на новый язык сбросит его
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления языка")
                 _errorMessage.value = "Не удалось обновить язык: ${e.message}"
-                Log.e("SettingsVM", "Ошибка обновления языка", e)
             }
         }
     }
 
+    /**
+     * Обновляет стартовый экран приложения
+     */
     private fun updateStartScreen(screenType: Int) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateStartScreen(screenType)
-                _successMessage.value = "Стартовый экран обновлен"
-
-                // Send event to notify that start screen was updated
-                _events.emit(SettingsEvent.StartScreenChanged(screenType))
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить стартовый экран: ${e.message}"
+        executeOperation(
+            operation = { userPreferencesRepository.updateStartScreen(screenType) },
+            successMessage = "Стартовый экран обновлен",
+            errorMessage = "Не удалось обновить стартовый экран",
+            onSuccess = {
+                viewModelScope.launch {
+                    _events.emit(SettingsEvent.StartScreenChanged(screenType))
+                }
             }
-        }
+        )
     }
 
+    /**
+     * Обновляет тип отображения задач по умолчанию
+     */
     private fun updateDefaultTaskView(viewType: Int) {
         viewModelScope.launch {
             try {
-                val currentPrefs = userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(defaultTaskView = com.example.dhbt.domain.model.TaskView.fromInt(viewType))
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    defaultTaskView = com.example.dhbt.domain.model.TaskView.fromInt(viewType)
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = "Тип отображения задач обновлен"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления типа отображения задач")
                 _errorMessage.value = "Не удалось обновить тип отображения задач: ${e.message}"
             }
         }
     }
 
+    /**
+     * Обновляет сортировку задач по умолчанию
+     */
     private fun updateDefaultTaskSort(sortType: Int) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(defaultTaskSort = com.example.dhbt.domain.model.TaskSort.fromInt(sortType))
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    defaultTaskSort = com.example.dhbt.domain.model.TaskSort.fromInt(sortType)
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = "Сортировка задач обновлена"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления сортировки задач")
                 _errorMessage.value = "Не удалось обновить сортировку задач: ${e.message}"
             }
         }
     }
 
+    /**
+     * Обновляет сортировку привычек по умолчанию
+     */
     private fun updateDefaultHabitSort(sortType: Int) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(defaultHabitSort = com.example.dhbt.domain.model.HabitSort.fromInt(sortType))
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    defaultHabitSort = com.example.dhbt.domain.model.HabitSort.fromInt(sortType)
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = "Сортировка привычек обновлена"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления сортировки привычек")
                 _errorMessage.value = "Не удалось обновить сортировку привычек: ${e.message}"
             }
         }
     }
 
+    /**
+     * Обновляет время напоминания о задачах
+     */
     private fun updateReminderTime(minutes: Int) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(reminderTimeBeforeTask = minutes)
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    reminderTimeBeforeTask = minutes
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = "Время напоминания обновлено"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления времени напоминания")
                 _errorMessage.value = "Не удалось обновить время напоминания: ${e.message}"
             }
         }
     }
 
+    /**
+     * Включает/отключает звук уведомлений
+     */
     private fun updateSoundEnabled(enabled: Boolean) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(defaultSoundEnabled = enabled)
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    defaultSoundEnabled = enabled
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = if (enabled) "Звук включен" else "Звук отключен"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления настроек звука")
                 _errorMessage.value = "Не удалось обновить настройки звука: ${e.message}"
             }
         }
     }
 
+    /**
+     * Включает/отключает вибрацию для уведомлений
+     */
     private fun updateVibrationEnabled(enabled: Boolean) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(defaultVibrationEnabled = enabled)
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    defaultVibrationEnabled = enabled
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = if (enabled) "Вибрация включена" else "Вибрация отключена"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления настроек вибрации")
                 _errorMessage.value = "Не удалось обновить настройки вибрации: ${e.message}"
             }
         }
     }
 
+    /**
+     * Обновляет настройки тихих часов
+     */
     private fun updateQuietHours(enabled: Boolean, start: String?, end: String?) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateQuietHours(enabled, start, end)
-                _successMessage.value = if (enabled) "Тихие часы настроены" else "Тихие часы отключены"
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить настройки тихих часов: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { userPreferencesRepository.updateQuietHours(enabled, start, end) },
+            successMessage = if (enabled) "Тихие часы настроены" else "Тихие часы отключены",
+            errorMessage = "Не удалось обновить настройки тихих часов"
+        )
     }
 
+    /**
+     * Обновляет настройки облачной синхронизации
+     */
     private fun updateCloudSync(enabled: Boolean) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.getUserPreferences().collect { prefs ->
-                    userPreferencesRepository.updateUserPreferences(
-                        prefs.copy(cloudSyncEnabled = enabled)
-                    )
-                }
+                val preferences = userPreferencesRepository.getUserPreferences().first()
+                val newPreferences = preferences.copy(
+                    cloudSyncEnabled = enabled
+                )
+                userPreferencesRepository.updateUserPreferences(newPreferences)
                 _successMessage.value = if (enabled) "Облачная синхронизация включена" else "Облачная синхронизация отключена"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка обновления настроек синхронизации")
                 _errorMessage.value = "Не удалось обновить настройки синхронизации: ${e.message}"
             }
         }
     }
 
+    /**
+     * Обновляет имя пользователя
+     */
     private fun updateUserName(name: String) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateUserName(name)
-                _successMessage.value = "Имя пользователя обновлено"
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить имя пользователя: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { userPreferencesRepository.updateUserName(name) },
+            successMessage = "Имя пользователя обновлено",
+            errorMessage = "Не удалось обновить имя пользователя"
+        )
     }
 
+    /**
+     * Обновляет email пользователя
+     */
     private fun updateUserEmail(email: String) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateUserEmail(email)
-                _successMessage.value = "Email пользователя обновлен"
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить email пользователя: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { userPreferencesRepository.updateUserEmail(email) },
+            successMessage = "Email пользователя обновлен",
+            errorMessage = "Не удалось обновить email пользователя"
+        )
     }
 
+    /**
+     * Обновляет URL аватара пользователя
+     */
     private fun updateUserAvatar(avatarUrl: String) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateUserAvatar(avatarUrl)
-                _successMessage.value = "Аватар пользователя обновлен"
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить аватар пользователя: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { userPreferencesRepository.updateUserAvatar(avatarUrl) },
+            successMessage = "Аватар пользователя обновлен",
+            errorMessage = "Не удалось обновить аватар пользователя"
+        )
     }
 
+    /**
+     * Обновляет время пробуждения и сна
+     */
     private fun updateWakeupSleepTime(wakeupTime: String?, sleepTime: String?) {
-        viewModelScope.launch {
-            try {
-                userPreferencesRepository.updateWakeupAndSleepTime(wakeupTime, sleepTime)
-                _successMessage.value = "Время пробуждения и сна обновлены"
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить время пробуждения и сна: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { userPreferencesRepository.updateWakeupAndSleepTime(wakeupTime, sleepTime) },
+            successMessage = "Время пробуждения и сна обновлены",
+            errorMessage = "Не удалось обновить время пробуждения и сна"
+        )
     }
 
+    /**
+     * Добавляет новую категорию
+     */
     private fun addCategory(category: Category) {
-        viewModelScope.launch {
-            try {
-                categoryRepository.addCategory(category)
-                _successMessage.value = "Категория добавлена"
-                _showCategoryDialog.value = false
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось добавить категорию: ${e.message}"
-            }
-        }
+        executeOperation(
+            operation = { categoryRepository.addCategory(category) },
+            successMessage = "Категория добавлена",
+            errorMessage = "Не удалось добавить категорию",
+            onSuccess = { _showCategoryDialog.value = false }
+        )
     }
 
+    /**
+     * Обновляет существующую категорию
+     */
     private fun updateCategory(category: Category) {
-        viewModelScope.launch {
-            try {
-                categoryRepository.updateCategory(category)
-                _successMessage.value = "Категория обновлена"
+        executeOperation(
+            operation = { categoryRepository.updateCategory(category) },
+            successMessage = "Категория обновлена",
+            errorMessage = "Не удалось обновить категорию",
+            onSuccess = {
                 _showCategoryDialog.value = false
                 _editCategory.value = null
-            } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить категорию: ${e.message}"
             }
-        }
+        )
     }
 
+    /**
+     * Удаляет категорию если она не используется
+     */
     private fun deleteCategory(categoryId: String) {
         viewModelScope.launch {
             try {
@@ -393,60 +454,118 @@ class SettingsViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Удаляем категорию если она не используется
                 categoryRepository.deleteCategory(categoryId)
                 _successMessage.value = "Категория удалена"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка удаления категории")
                 _errorMessage.value = "Не удалось удалить категорию: ${e.message}"
             }
         }
     }
 
+    /**
+     * Начинает редактирование категории
+     */
     private fun startEditCategory(category: Category) {
         _editCategory.value = category
         _showCategoryDialog.value = true
     }
 
+    /**
+     * Обновляет настройки Pomodoro
+     */
     private fun updatePomodoroSettings(settings: PomodoroPreferences) {
+        executeOperation(
+            operation = { pomodoroRepository.updatePomodoroPreferences(settings) },
+            successMessage = "Настройки Pomodoro обновлены",
+            errorMessage = "Не удалось обновить настройки Pomodoro"
+        )
+    }
+
+    /**
+     * Сбрасывает все данные приложения и настройки
+     */
+    private fun resetAllData() {
         viewModelScope.launch {
             try {
-                pomodoroRepository.updatePomodoroPreferences(settings)
-                _successMessage.value = "Настройки Pomodoro обновлены"
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                    userPreferencesRepository.clearUserData()
+
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                _successMessage.value = "Все данные сброшены"
+                _showDeleteDialog.value = false
+
+                // Отправляем событие о завершении сброса данных
+                _events.emit(SettingsEvent.SettingsResetComplete)
+
+                // Добавляем событие перезапуска приложения для применения изменений
+                _events.emit(SettingsEvent.RestartApp)
             } catch (e: Exception) {
-                _errorMessage.value = "Не удалось обновить настройки Pomodoro: ${e.message}"
+                if (e is CancellationException) throw e
+
+                Timber.e(e, "Ошибка сброса данных")
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                _errorMessage.value = "Не удалось сбросить данные: ${e.message}"
             }
         }
     }
 
-    private fun resetAllData() {
+    /**
+     * Универсальный обработчик операций с репозиториями для унификации кода
+     */
+    private fun executeOperation(
+        operation: suspend () -> Unit,
+        successMessage: String,
+        errorMessage: String,
+        onSuccess: (() -> Unit)? = null
+    ) {
         viewModelScope.launch {
             try {
-                userPreferencesRepository.clearUserData()
-                _successMessage.value = "Все данные сброшены"
-                _showDeleteDialog.value = false
+                operation()
+                _successMessage.value = successMessage
+                onSuccess?.invoke()
             } catch (e: Exception) {
-                _errorMessage.value = "Не удалось сбросить данные: ${e.message}"
+                if (e is CancellationException) throw e
+                Timber.e(e, errorMessage)
+                _errorMessage.value = "$errorMessage: ${e.message}"
             }
         }
     }
 }
 
+/**
+ * Состояние UI экрана настроек
+ */
 data class SettingsUiState(
     val isLoading: Boolean = true,
     val error: String? = null
 )
 
+/**
+ * Опция языка для выбора в настройках
+ */
 data class LanguageOption(
     val code: String,
     val displayName: String
 )
 
+/**
+ * События для уведомления UI об изменениях
+ */
 sealed class SettingsEvent {
     data class LanguageChanged(val language: String) : SettingsEvent()
     data class StartScreenChanged(val screenType: Int) : SettingsEvent()
     data class ThemeChanged(val theme: AppTheme) : SettingsEvent()
     object SettingsResetComplete : SettingsEvent()
+    object RestartApp : SettingsEvent() // Новое событие для перезапуска приложения
 }
 
+/**
+ * Действия, которые могут быть выполнены пользователем на экране настроек
+ */
 sealed class SettingsAction {
     data class UpdateTheme(val themeMode: Int) : SettingsAction()
     data class UpdateLanguage(val language: String) : SettingsAction()

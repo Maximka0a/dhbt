@@ -1,8 +1,5 @@
 package com.example.dhbt.presentation.settings
 
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.border
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -11,18 +8,90 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,8 +103,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.dhbt.domain.model.*
-import kotlinx.coroutines.launch
+import com.example.dhbt.domain.model.AppTheme
+import com.example.dhbt.domain.model.Category
+import com.example.dhbt.domain.model.CategoryType
+import com.example.dhbt.domain.model.StartScreen
+import com.example.dhbt.domain.model.UserData
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,19 +234,6 @@ fun SettingsScreen(
 
                 // Секция уведомлений
                 SettingsSection(title = "Уведомления и напоминания") {
-                    // Время напоминания перед задачей
-                    SliderSettingItem(
-                        icon = Icons.Default.Notifications,
-                        title = "Время напоминания",
-                        subtitle = "За ${userPreferences.reminderTimeBeforeTask} минут до задачи",
-                        value = userPreferences.reminderTimeBeforeTask.toFloat(),
-                        valueRange = 5f..60f,
-                        steps = 11,
-                        onValueChange = {
-                            viewModel.onAction(SettingsAction.UpdateReminderTime(it.toInt()))
-                        }
-                    )
-
                     // Звук
                     SwitchSettingItem(
                         icon = Icons.Default.VolumeUp,
@@ -195,17 +254,6 @@ fun SettingsScreen(
                         onCheckedChange = {
                             viewModel.onAction(SettingsAction.UpdateVibrationEnabled(it))
                         }
-                    )
-
-                    // Тихие часы
-                    SettingsItem(
-                        icon = Icons.Default.Bedtime,
-                        title = "Тихие часы",
-                        subtitle = if (userPreferences.quietHoursEnabled)
-                            "C ${userPreferences.quietHoursStart} до ${userPreferences.quietHoursEnd}"
-                        else
-                            "Отключены",
-                        onClick = { viewModel.onAction(SettingsAction.ToggleQuietHoursDialog(true)) }
                     )
                 }
 
@@ -383,32 +431,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Синхронизация и данные
-                SettingsSection(title = "Синхронизация и данные") {
-                    // Облачная синхронизация
-                    SwitchSettingItem(
-                        icon = Icons.Default.CloudSync,
-                        title = "Облачная синхронизация",
-                        subtitle = if (userPreferences.cloudSyncEnabled) "Включена" else "Отключена",
-                        isChecked = userPreferences.cloudSyncEnabled,
-                        onCheckedChange = {
-                            viewModel.onAction(SettingsAction.UpdateCloudSync(it))
-                        }
-                    )
-
-                    // Сброс данных
-                    SettingsItem(
-                        icon = Icons.Default.DeleteForever,
-                        title = "Сбросить все данные",
-                        subtitle = "Удалит все данные без возможности восстановления",
-                        onClick = { viewModel.onAction(SettingsAction.ToggleDeleteDialog(true)) },
-                        iconTint = MaterialTheme.colorScheme.error,
-                        titleColor = MaterialTheme.colorScheme.error
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1388,8 +1410,6 @@ fun ThemeSelectionDialog(
         }
     )
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuietHoursDialog(
     enabled: Boolean,

@@ -40,7 +40,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -58,7 +57,6 @@ import com.example.dhbt.presentation.navigation.DHbtBottomNavigation
 import com.example.dhbt.presentation.navigation.DHbtNavHost
 import com.example.dhbt.presentation.navigation.Dashboard
 import com.example.dhbt.presentation.navigation.Habits
-import com.example.dhbt.presentation.navigation.More
 import com.example.dhbt.presentation.navigation.Onboarding
 import com.example.dhbt.presentation.navigation.Statistics
 import com.example.dhbt.presentation.navigation.Tasks
@@ -95,7 +93,6 @@ class MainActivity : ComponentActivity() {
         // Настройка полноэкранного режима и прозрачных системных полос
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-
 
         // Наблюдение за событиями от ViewModel
         lifecycleScope.launch {
@@ -150,10 +147,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             DHbtApp(viewModel = viewModel)
         }
-
         Timber.tag(TAG).d("onCreate: инициализация завершена")
     }
-
 
     override fun onResume() {
         super.onResume()
@@ -232,7 +227,7 @@ fun DHbtApp(
         }
     }
     // Наблюдаем за жизненным циклом
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -298,16 +293,15 @@ fun DHbtApp(
         val currentBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = currentBackStackEntry?.destination?.route
 
-        // Маршруты, на которых показываем нижнюю навигацию
-        val mainRoutes = listOf(
-            Dashboard::class.qualifiedName,
-            Tasks::class.qualifiedName,
-            Habits::class.qualifiedName,
-            Statistics::class.qualifiedName,
-            More::class.qualifiedName
-        )
-
-        val showBottomNav = currentRoute in mainRoutes
+        val showBottomNav = when {
+            currentRoute == null -> false
+            currentRoute.contains(Dashboard::class.qualifiedName ?: "") -> true
+            currentRoute.contains(Tasks::class.qualifiedName ?: "") -> true
+            currentRoute.contains(Habits::class.qualifiedName ?: "") -> true
+            currentRoute.contains(Statistics::class.qualifiedName ?: "") -> true
+            currentRoute.contains("Pomodoro") -> true
+            else -> false
+        }
         val bottomNavHeight = 80.dp
 
         // Логируем изменение маршрутов

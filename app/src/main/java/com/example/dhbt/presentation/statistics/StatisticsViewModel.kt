@@ -2,14 +2,7 @@ package com.example.dhbt.presentation.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.dhbt.domain.model.Habit
-import com.example.dhbt.domain.model.HabitStatus
-import com.example.dhbt.domain.model.HabitTracking
-import com.example.dhbt.domain.model.HabitType
-import com.example.dhbt.domain.model.PomodoroSessionType
-import com.example.dhbt.domain.model.TaskPriority
-import com.example.dhbt.domain.model.StatisticPeriod
-import com.example.dhbt.domain.model.TaskStatus
+import com.example.dhbt.domain.model.*
 import com.example.dhbt.domain.repository.HabitRepository
 import com.example.dhbt.domain.repository.PomodoroRepository
 import com.example.dhbt.domain.repository.StatisticsRepository
@@ -17,17 +10,19 @@ import com.example.dhbt.domain.repository.TaskRepository
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.PieEntry
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import com.example.dhbt.domain.model.StatisticPeriod
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import timber.log.Timber
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
-
+/**
+ * ViewModel для экрана статистики с оптимизированным управлением данными
+ * и эффективной загрузкой метрик для различных периодов времени.
+ */
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
     private val statisticsRepository: StatisticsRepository,
@@ -36,84 +31,108 @@ class StatisticsViewModel @Inject constructor(
     private val pomodoroRepository: PomodoroRepository
 ) : ViewModel() {
 
-    // UI состояние
+    // Состояние пользовательского интерфейса и выбранные параметры
     private val _uiState = MutableStateFlow(StatisticsUiState())
     val uiState = _uiState.asStateFlow()
 
-    // Выбранный период анализа
+    // Используем StatisticPeriod из domain слоя, а не дублируем его в presentation
     private val _selectedPeriod = MutableStateFlow(StatisticPeriod.WEEK)
-    val selectedPeriod = _selectedPeriod.asStateFlow()
-
-    // Выбранная вкладка (задачи, привычки, помодоро)
-    private val _selectedTab = MutableStateFlow(StatisticsTab.PRODUCTIVITY)
-    val selectedTab = _selectedTab.asStateFlow()
-
-    // Метрики производительности
-    private val _productivityMetrics = MutableStateFlow<ProductivityMetrics?>(null)
-    val productivityMetrics = _productivityMetrics.asStateFlow()
-
-    // Метрики задач
-    private val _taskMetrics = MutableStateFlow<TaskMetrics?>(null)
-    val taskMetrics = _taskMetrics.asStateFlow()
-
-    // Метрики привычек
-    private val _habitMetrics = MutableStateFlow<HabitMetrics?>(null)
-    val habitMetrics = _habitMetrics.asStateFlow()
-
-    // Метрики Pomodoro
-    private val _pomodoroMetrics = MutableStateFlow<PomodoroMetrics?>(null)
-    val pomodoroMetrics = _pomodoroMetrics.asStateFlow()
-
-    // Данные для временного графика (задачи или привычки по дням)
-    private val _timelineChartData = MutableStateFlow<List<Entry>>(emptyList())
-    val timelineChartData = _timelineChartData.asStateFlow()
-
-    // Данные для круговых диаграмм
-    private val _pieChartData = MutableStateFlow<Map<String, List<PieEntry>>>(emptyMap())
-    val pieChartData = _pieChartData.asStateFlow()
-
-    // Общая статистическая информация за текущий период
-    private val _summaryStats = MutableStateFlow<Map<String, String>>(emptyMap())
-    val summaryStats = _summaryStats.asStateFlow()
-
-    // Выбранная дата для детальной статистики (по умолчанию сегодня)
+    private val _selectedTab = MutableStateFlow(StatisticsTab.TASKS)
     private val _selectedDate = MutableStateFlow(LocalDate.now())
-    val selectedDate = _selectedDate.asStateFlow()
 
-    // Список доступных месяцев для выбора
-    private val _availableMonths = MutableStateFlow<List<YearMonth>>(emptyList())
-    val availableMonths = _availableMonths.asStateFlow()
+    // Объединенные потоки данных для эффективности
+    val viewState = combine(
+        _uiState,
+        _selectedPeriod,
+        _selectedTab,
+        _selectedDate
+    ) { state, period, tab, date ->
+        StatisticsViewState(
+            isLoading = state.isLoading,
+            error = state.error,
+            selectedPeriod = period,
+            selectedTab = tab,
+            selectedDate = date
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = StatisticsViewState()
+    )
 
-    // Список доступных лет для выбора
-    private val _availableYears = MutableStateFlow<List<Int>>(emptyList())
-    val availableYears = _availableYears.asStateFlow()
+    // Потоки метрик с отложенной загрузкой и кешированием
+    private val _metricsData = MutableStateFlow<StatisticsMetricsData?>(null)
 
-    // Количество дней в текущем периоде
-    private val _daysInSelectedPeriod = MutableStateFlow(7)
-    val daysInSelectedPeriod = _daysInSelectedPeriod.asStateFlow()
+    // Производные потоки данных для UI
+    val productivityMetrics = _metricsData.map { it?.productivityMetrics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val taskMetrics = _metricsData.map { it?.taskMetrics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val habitMetrics = _metricsData.map { it?.habitMetrics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val pomodoroMetrics = _metricsData.map { it?.pomodoroMetrics }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // Данные для графиков, обновляются при изменении вкладки или метрик
+    val chartData = combine(
+        _selectedTab,
+        _metricsData
+    ) { tab, data ->
+        generateChartData(tab, data)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        StatisticsChartData()
+    )
+
+    // Сводные метрики
+    val summaryStats = _metricsData
+        .map { generateSummaryStatistics(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    // Списки доступных периодов для выбора
+    private val _periodsData = MutableStateFlow(StatisticsPeriodsData())
+    val periodsData = _periodsData.asStateFlow()
+
+    // Отслеживание текущих загружаемых данных для избежания дублирования запросов
+    private var currentLoadJob: Job? = null
+    private var lastLoadedPeriod: StatisticPeriod? = null
+    private var lastLoadedRange: Pair<Long, Long>? = null
 
     init {
-        // Инициализация доступных периодов
         initializeAvailablePeriods()
 
-        // Загрузка начальных данных
-        loadStatisticsForPeriod(StatisticPeriod.WEEK)
-
-        // Наблюдение за изменениями периода
+        // Наблюдаем за изменениями периода и вкладки
         viewModelScope.launch {
-            _selectedPeriod.collect { period ->
-                loadStatisticsForPeriod(period)
-            }
-        }
-
-        // Наблюдение за изменениями вкладки
-        viewModelScope.launch {
-            _selectedTab.collect { tab ->
-                updateChartsForTab(tab)
-            }
+            _selectedPeriod
+                .collect { period ->
+                    loadStatisticsForPeriod(period)
+                }
         }
     }
 
+    /**
+     * Обрабатывает пользовательские действия
+     */
+    fun onAction(action: StatisticsAction) {
+        when (action) {
+            is StatisticsAction.SetPeriod -> {
+                _selectedPeriod.value = action.period
+                _periodsData.update { it.copy(daysInSelectedPeriod = calculateDaysInPeriod(action.period)) }
+            }
+            is StatisticsAction.SetTab -> _selectedTab.value = action.tab
+            is StatisticsAction.SetDate -> _selectedDate.value = action.date
+            is StatisticsAction.RefreshData -> refreshData()
+            is StatisticsAction.ExportStatistics -> exportStatisticsData()
+        }
+    }
+
+    /**
+     * Инициализирует списки доступных периодов для выбора
+     */
     private fun initializeAvailablePeriods() {
         val now = LocalDate.now()
 
@@ -121,154 +140,226 @@ class StatisticsViewModel @Inject constructor(
         val months = (0L..11L).map { now.minusMonths(it) }
             .map { YearMonth.of(it.year, it.month) }
             .reversed()
-        _availableMonths.value = months
 
         // Доступные годы - последние 3 года
         val years = (0L..2L).map { now.year - it.toInt() }.reversed()
-        _availableYears.value = years
-    }
 
-    fun onAction(action: StatisticsAction) {
-        when (action) {
-            is StatisticsAction.SetPeriod -> {
-                _selectedPeriod.value = action.period
-                adjustDaysInPeriod(action.period)
-            }
-            is StatisticsAction.SetTab -> _selectedTab.value = action.tab
-            is StatisticsAction.SetDate -> _selectedDate.value = action.date
-            is StatisticsAction.RefreshData -> loadStatisticsForPeriod(_selectedPeriod.value)
-            is StatisticsAction.ExportStatistics -> exportStatisticsData()
+        _periodsData.update {
+            StatisticsPeriodsData(
+                availableMonths = months,
+                availableYears = years,
+                daysInSelectedPeriod = calculateDaysInPeriod(_selectedPeriod.value)
+            )
         }
     }
 
-    private fun adjustDaysInPeriod(period: StatisticPeriod) {
-        _daysInSelectedPeriod.value = when(period) {
+    /**
+     * Вычисляет количество дней в выбранном периоде
+     */
+    private fun calculateDaysInPeriod(period: StatisticPeriod): Int {
+        return when(period) {
             StatisticPeriod.DAY -> 1
             StatisticPeriod.WEEK -> 7
-            StatisticPeriod.MONTH -> 30
-            StatisticPeriod.YEAR -> 365
+            StatisticPeriod.MONTH -> YearMonth.now().lengthOfMonth()
+            StatisticPeriod.YEAR -> if (YearMonth.now().isLeapYear) 366 else 365
         }
     }
 
+    /**
+     * Принудительно обновляет данные
+     */
+    private fun refreshData() {
+        lastLoadedPeriod = null
+        lastLoadedRange = null
+        loadStatisticsForPeriod(_selectedPeriod.value)
+    }
+
+    /**
+     * Загружает статистические данные для выбранного периода
+     */
     private fun loadStatisticsForPeriod(period: StatisticPeriod) {
+        // Отменяем предыдущую загрузку, если она еще выполняется
+        currentLoadJob?.cancel()
+
+        // Рассчитываем временной диапазон
+        val dateRange = calculateDateRange(period)
+
+        // Проверяем, не загружены ли уже данные для этого периода
+        if (period == lastLoadedPeriod && dateRange == lastLoadedRange) {
+            Timber.d("Данные для периода $period уже загружены")
+            return
+        }
+
         _uiState.update { it.copy(isLoading = true, error = null) }
 
-        viewModelScope.launch {
+        currentLoadJob = viewModelScope.launch(Dispatchers.IO + SupervisorJob()) {
             try {
-                // Определяем временной диапазон на основе периода
-                val (startDate, endDate) = calculateDateRange(period)
+                // Создаём контейнер для всех метрик
+                val metrics = StatisticsMetricsData()
 
-                // Загрузка всех необходимых данных
-                loadProductivityMetrics(startDate, endDate)
-                loadTaskMetrics(startDate, endDate)
-                loadHabitMetrics(startDate, endDate)
-                loadPomodoroMetrics(startDate, endDate)
+                // Запускаем параллельную загрузку различных метрик
+                val (startDate, endDate) = dateRange
+                val jobs = listOf(
+                    async { loadProductivityMetrics(startDate, endDate, metrics) },
+                    async { loadTaskMetrics(startDate, endDate, metrics) },
+                    async { loadHabitMetrics(startDate, endDate, metrics) },
+                    async { loadPomodoroMetrics(startDate, endDate, metrics) }
+                )
 
-                // Обновляем графики для текущей вкладки
-                updateChartsForTab(_selectedTab.value)
+                // Ждём завершения всех операций загрузки
+                jobs.awaitAll()
 
-                // Генерируем сводную статистику
-                generateSummaryStatistics()
+                // Сохраняем результат
+                _metricsData.value = metrics
+
+                // Запоминаем загруженный период
+                lastLoadedPeriod = period
+                lastLoadedRange = dateRange
 
                 _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                if (e is CancellationException) throw e
+                Timber.e(e, "Ошибка при загрузке статистики")
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Неизвестная ошибка") }
             }
         }
     }
 
+    /**
+     * Вычисляет временной диапазон на основе выбранного периода
+     */
     private fun calculateDateRange(period: StatisticPeriod): Pair<Long, Long> {
         val today = LocalDate.now()
-        val startDate = when (period) {
-            StatisticPeriod.DAY -> today.atStartOfDay()
-            StatisticPeriod.WEEK -> today.minusDays(6).atStartOfDay()
-            StatisticPeriod.MONTH -> today.minusDays(29).atStartOfDay()
-            StatisticPeriod.YEAR -> today.minusYears(1).plusDays(1).atStartOfDay()
+        val zonedEndDate = today.plusDays(1).atStartOfDay(ZoneId.systemDefault())
+
+        val startLocalDate = when (period) {
+            StatisticPeriod.DAY -> today
+            StatisticPeriod.WEEK -> today.minusDays(6)
+            StatisticPeriod.MONTH -> today.minusDays(today.dayOfMonth.toLong() - 1)
+            StatisticPeriod.YEAR -> today.withDayOfYear(1)
         }
-        val endDate = today.plusDays(1).atStartOfDay().minusNanos(1)
+
+        val zonedStartDate = startLocalDate.atStartOfDay(ZoneId.systemDefault())
 
         return Pair(
-            startDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            endDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            zonedStartDate.toInstant().toEpochMilli(),
+            zonedEndDate.toInstant().toEpochMilli() - 1
         )
     }
 
-    private suspend fun loadProductivityMetrics(startDate: Long, endDate: Long) {
+    /**
+     * Загружает метрики продуктивности
+     */
+    private suspend fun loadProductivityMetrics(startDate: Long, endDate: Long, metrics: StatisticsMetricsData) {
         try {
-            // Получаем статистику из репозитория
+            // Правильно используем тип StatisticPeriod из domain слоя
             val statisticSummaries = statisticsRepository.getStatisticsForRange(
                 startDate, endDate, _selectedPeriod.value
             ).first()
 
-            // Метрики выполнения задач - Handle empty lists and NaN
-            val taskCompletionValues = statisticSummaries.mapNotNull { it.taskCompletionPercentage }
-            val taskCompletion = if (taskCompletionValues.isEmpty()) 0.0
-            else taskCompletionValues.average() * 100
+            // Метрики выполнения задач - обрабатываем пустые списки и NaN
+            val taskCompletionRate = statisticSummaries
+                .mapNotNull { it.taskCompletionPercentage }
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?.times(100)
+                ?: 0.0
 
-            // Метрики выполнения привычек - Handle empty lists and NaN
-            val habitCompletionValues = statisticSummaries.mapNotNull { it.habitCompletionPercentage }
-            val habitCompletion = if (habitCompletionValues.isEmpty()) 0.0
-            else habitCompletionValues.average() * 100
+            // Метрики выполнения привычек
+            val habitCompletionRate = statisticSummaries
+                .mapNotNull { it.habitCompletionPercentage }
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?.times(100)
+                ?: 0.0
 
-            // Общее время сфокусированной работы
+            // Общее время фокусировки
             val totalPomodoroMinutes = statisticSummaries
                 .mapNotNull { it.totalPomodoroMinutes }
                 .sum()
 
-            // Серия продуктивных дней
+            // Продуктивная серия
             val productiveStreak = statisticSummaries
                 .mapNotNull { it.productiveStreak }
                 .maxOrNull() ?: 0
 
-            _productivityMetrics.value = ProductivityMetrics(
-                taskCompletionRate = taskCompletion,
-                habitCompletionRate = habitCompletion,
+            metrics.productivityMetrics = ProductivityMetrics(
+                taskCompletionRate = taskCompletionRate,
+                habitCompletionRate = habitCompletionRate,
                 focusTimeMinutes = totalPomodoroMinutes,
                 productiveStreak = productiveStreak,
                 daysAnalyzed = statisticSummaries.size
             )
         } catch (e: Exception) {
-            _uiState.update { it.copy(error = "Ошибка загрузки метрик: ${e.message}") }
+            Timber.e(e, "Ошибка загрузки метрик продуктивности")
+            throw e
         }
     }
 
-    private suspend fun loadTaskMetrics(startDate: Long, endDate: Long) {
+    /**
+     * Загружает метрики задач
+     */
+    private suspend fun loadTaskMetrics(startDate: Long, endDate: Long, metrics: StatisticsMetricsData) {
         try {
-            // Получаем задачи в указанном диапазоне
-            val tasks = taskRepository.getAllTasks()
-                .first()
-                .filter { task ->
-                    task.dueDate != null && task.dueDate in startDate..endDate
+            // Получаем все задачи
+            val allTasks = taskRepository.getAllTasks().first()
+
+            // 1. Задачи, попадающие в период по дате завершения
+            val completedTasksInPeriod = allTasks.filter { task ->
+                task.status == TaskStatus.COMPLETED &&
+                        task.completionDate != null &&
+                        task.completionDate in startDate..endDate
+            }
+
+            // 2. Задачи, попадающие в период по дате выполнения
+            val activeTasksInPeriod = allTasks.filter { task ->
+                task.status != TaskStatus.COMPLETED &&
+                        task.dueDate != null &&
+                        task.dueDate in startDate..endDate
+            }
+
+            // 3. Объединяем выборки для метрик
+            val tasksInPeriod = completedTasksInPeriod + activeTasksInPeriod
+
+            // Если совсем нет задач в периоде, показываем хотя бы общую статистику о завершенных
+            // (можно убрать, если нужны только задачи строго из периода)
+            val tasksToAnalyze = if (tasksInPeriod.isEmpty()) {
+                allTasks.filter { it.status == TaskStatus.COMPLETED }.take(10)
+            } else {
+                tasksInPeriod
+            }
+
+            val completedTasks = tasksToAnalyze.count { it.status == TaskStatus.COMPLETED }
+            val totalTasks = tasksToAnalyze.size
+
+            // Остальной код остается без изменений
+            val categoryDistribution = tasksToAnalyze
+                .groupingBy { it.categoryId }
+                .eachCount()
+
+            val priorityDistribution = tasksToAnalyze
+                .groupingBy { it.priority }
+                .eachCount()
+                .withDefault { 0 }
+
+            val dayOfWeekDistribution = tasksToAnalyze
+                .asSequence()
+                .filter { it.dueDate != null || it.completionDate != null }
+                .map {
+                    val millis = it.completionDate ?: it.dueDate ?: 0L
+                    LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000)).dayOfWeek.value
                 }
+                .groupingBy { it }
+                .eachCount()
 
-            // Количество выполненных и общее количество задач
-            val completedTasks = tasks.count { it.status == TaskStatus.COMPLETED }
-            val totalTasks = tasks.size
-
-            // Распределение по категориям
-            val categoryDistribution = tasks
-                .groupBy { it.categoryId }
-                .mapValues { it.value.size }
-
-            // Распределение по приоритетам
-            val priorityDistribution = tasks
-                .groupBy { it.priority }
-                .mapValues { it.value.size }
-
-            // Распределение по дням недели
-            val dayOfWeekDistribution = tasks
-                .filter { it.dueDate != null }
-                .groupBy { LocalDate.ofEpochDay(it.dueDate!! / (24 * 60 * 60 * 1000)).dayOfWeek.value }
-                .mapValues { it.value.size }
-
-            // Среднее время выполнения задач
-            val averageCompletionTime = tasks
+            val averageCompletionTime = tasksToAnalyze
+                .asSequence()
                 .filter { it.status == TaskStatus.COMPLETED && it.completionDate != null && it.creationDate > 0 }
                 .map { it.completionDate!! - it.creationDate }
                 .average()
                 .takeIf { !it.isNaN() } ?: 0.0
 
-            _taskMetrics.value = TaskMetrics(
+            metrics.taskMetrics = TaskMetrics(
                 completedTasks = completedTasks,
                 totalTasks = totalTasks,
                 categoryDistribution = categoryDistribution,
@@ -276,47 +367,60 @@ class StatisticsViewModel @Inject constructor(
                 dayOfWeekDistribution = dayOfWeekDistribution,
                 averageCompletionTimeMinutes = (averageCompletionTime / (1000 * 60)).toInt()
             )
+
         } catch (e: Exception) {
-            _uiState.update { it.copy(error = "Ошибка загрузки метрик задач: ${e.message}") }
+            Timber.e(e, "Ошибка загрузки метрик задач")
+            throw e
         }
     }
 
-    private suspend fun loadHabitMetrics(startDate: Long, endDate: Long) {
+    /**
+     * Загружает метрики привычек
+     */
+    private suspend fun loadHabitMetrics(startDate: Long, endDate: Long, metrics: StatisticsMetricsData) {
         try {
-            // Получаем привычки
-            val habits = habitRepository.getAllHabits().first()
-
-            // Получаем историю отслеживания привычек в указанном диапазоне
+            // Используем структурированный подход и кеширование
+            val habitData = mutableListOf<HabitData>()
             var totalTracking = 0
             var completedTracking = 0
             var longestStreak = 0
             var currentStreak = 0
 
-            val habitData = habits.map { habit ->
+            // Получаем все привычки одним запросом
+            val habits = habitRepository.getAllHabits().first()
+
+            // Для каждой привычки получаем отслеживания в указанном диапазоне
+            habits.forEach { habit ->
                 val tracking = habitRepository.getHabitTrackingsForRange(habit.id, startDate, endDate).first()
+
+                // Обновляем агрегированные метрики
                 totalTracking += tracking.size
                 completedTracking += tracking.count { it.isCompleted }
                 if (habit.bestStreak > longestStreak) longestStreak = habit.bestStreak
                 if (habit.currentStreak > currentStreak) currentStreak = habit.currentStreak
 
-                HabitData(
-                    habit = habit,
-                    tracking = tracking,
-                    completionRate = if (tracking.isEmpty()) 0.0 else tracking.count { it.isCompleted }.toDouble() / tracking.size
+                // Сохраняем данные для этой привычки
+                habitData.add(
+                    HabitData(
+                        habit = habit,
+                        tracking = tracking,
+                        completionRate = if (tracking.isEmpty()) 0.0
+                        else tracking.count { it.isCompleted }.toDouble() / tracking.size
+                    )
                 )
             }
 
-            // Распределение по типам привычек
+            // Получаем распределения по типам и категориям
             val typeDistribution = habits
-                .groupBy { it.type }
-                .mapValues { it.value.size }
+                .groupingBy { it.type }
+                .eachCount()
+                .withDefault { 0 }
 
-            // Распределение по категориям
             val categoryDistribution = habits
-                .groupBy { it.categoryId }
-                .mapValues { it.value.size }
+                .groupingBy { it.categoryId }
+                .eachCount()
 
-            _habitMetrics.value = HabitMetrics(
+            metrics.habitMetrics = HabitMetrics(
                 activeHabits = habits.count { it.status == HabitStatus.ACTIVE },
                 totalHabits = habits.size,
                 completionRate = if (totalTracking > 0) completedTracking.toDouble() / totalTracking else 0.0,
@@ -327,222 +431,313 @@ class StatisticsViewModel @Inject constructor(
                 habitData = habitData
             )
         } catch (e: Exception) {
-            _uiState.update { it.copy(error = "Ошибка загрузки метрик привычек: ${e.message}") }
+            Timber.e(e, "Ошибка загрузки метрик привычек")
+            throw e
         }
     }
 
-    private suspend fun loadPomodoroMetrics(startDate: Long, endDate: Long) {
+    /**
+     * Загружает метрики помодоро
+     */
+    private suspend fun loadPomodoroMetrics(startDate: Long, endDate: Long, metrics: StatisticsMetricsData) {
         try {
-            // Получаем сессии помодоро в указанном диапазоне
+            // Получаем сессии помодоро за выбранный период
             val pomodoroSessions = pomodoroRepository.getSessionsForTimeRange(startDate, endDate).first()
 
-            // Общее время фокуса
+            // Вычисляем общее время фокусировки (только завершенные рабочие сессии)
             val totalFocusTime = pomodoroSessions
                 .filter { it.type == PomodoroSessionType.WORK && it.isCompleted }
                 .sumOf { it.duration }
 
-            // Количество завершенных сессий
-            val completedSessions = pomodoroSessions
-                .count { it.isCompleted }
-
-            // Количество незавершенных сессий
+            // Количество завершенных и незавершенных сессий
+            val completedSessions = pomodoroSessions.count { it.isCompleted }
             val incompleteSessions = pomodoroSessions.size - completedSessions
 
-            // Распределение по дням
+            // Оптимизированное распределение по дням
             val dailyDistribution = pomodoroSessions
+                .asSequence()
                 .filter { it.type == PomodoroSessionType.WORK }
-                .groupBy { LocalDate.ofEpochDay(it.startTime / (24 * 60 * 60 * 1000)) }
-                .mapValues { entry ->
-                    entry.value.sumOf { it.duration }
+                .groupBy {
+                    LocalDate.ofEpochDay(it.startTime / (24 * 60 * 60 * 1000))
+                }
+                .mapValues { (_, sessions) ->
+                    sessions.sumOf { it.duration }
                 }
 
-            // Распределение по задачам
+            // Распределение по задачам (фильтруем null-задачи)
             val taskDistribution = pomodoroSessions
+                .asSequence()
                 .filter { it.type == PomodoroSessionType.WORK && it.taskId != null }
                 .groupBy { it.taskId }
-                .mapValues { entry ->
-                    entry.value.sumOf { it.duration }
+                .mapValues { (_, sessions) ->
+                    sessions.sumOf { it.duration }
                 }
 
-            _pomodoroMetrics.value = PomodoroMetrics(
+            // Расчет среднего дневного времени фокуса
+            val averageDailyMinutes = if (dailyDistribution.isNotEmpty())
+                totalFocusTime / dailyDistribution.size
+            else 0
+
+            metrics.pomodoroMetrics = PomodoroMetrics(
                 totalFocusTimeMinutes = totalFocusTime,
                 completedSessions = completedSessions,
                 incompleteSessions = incompleteSessions,
                 dailyDistribution = dailyDistribution,
                 taskDistribution = taskDistribution,
-                averageDailyMinutes = if (dailyDistribution.isEmpty()) 0 else totalFocusTime / dailyDistribution.size
+                averageDailyMinutes = averageDailyMinutes
             )
         } catch (e: Exception) {
-            _uiState.update { it.copy(error = "Ошибка загрузки метрик Pomodoro: ${e.message}") }
+            Timber.e(e, "Ошибка загрузки метрик Pomodoro")
+            throw e
         }
     }
 
-    private fun updateChartsForTab(tab: StatisticsTab) {
-        when (tab) {
-            StatisticsTab.PRODUCTIVITY -> updateProductivityCharts()
-            StatisticsTab.TASKS -> updateTaskCharts()
-            StatisticsTab.HABITS -> updateHabitCharts()
-            StatisticsTab.POMODORO -> updatePomodoroCharts()
+    /**
+     * Генерирует данные для графиков на основе выбранной вкладки
+     */
+    private fun generateChartData(tab: StatisticsTab, metricsData: StatisticsMetricsData?): StatisticsChartData {
+        if (metricsData == null) return StatisticsChartData()
+
+        return when (tab) {
+            StatisticsTab.TASKS -> generateTaskChartData(metricsData)
+            StatisticsTab.HABITS -> generateHabitChartData(metricsData)
+            StatisticsTab.POMODORO -> generatePomodoroChartData(metricsData)
         }
     }
 
-    private fun updateProductivityCharts() {
-        val productivity = _productivityMetrics.value ?: return
-        val tasks = _taskMetrics.value ?: return
-        val habits = _habitMetrics.value ?: return
-        val pomodoro = _pomodoroMetrics.value ?: return
+    /**
+     * Генерирует данные для графиков производительности
+     */
+    private fun generateProductivityChartData(metricsData: StatisticsMetricsData): StatisticsChartData {
+        val productivityMetrics = metricsData.productivityMetrics ?: return StatisticsChartData()
+        val taskMetrics = metricsData.taskMetrics ?: return StatisticsChartData()
 
-        // Линейный график производительности по дням
+        // Линейный график для отслеживания задач
         val period = _selectedPeriod.value
         val now = LocalDate.now()
-        val dateFormatter = DateTimeFormatter.ofPattern("dd.MM")
 
         val timelineData = when (period) {
             StatisticPeriod.DAY -> {
-                listOf(Entry(0f, productivity.taskCompletionRate.toFloat()))
+                listOf(Entry(0f, productivityMetrics.taskCompletionRate.toFloat()))
             }
             StatisticPeriod.WEEK -> {
                 (0..6).map { day ->
                     val date = now.minusDays((6 - day).toLong())
-                    val taskRate = tasks.dayOfWeekDistribution[date.dayOfWeek.value]?.toFloat() ?: 0f
-                    Entry(day.toFloat(), taskRate)
+                    val tasks = taskMetrics.dayOfWeekDistribution[date.dayOfWeek.value] ?: 0
+                    Entry(day.toFloat(), tasks.toFloat())
                 }
             }
             StatisticPeriod.MONTH -> {
-                (0..29).map { day ->
-                    val date = now.minusDays((29 - day).toLong())
-                    val taskRate = tasks.dayOfWeekDistribution[date.dayOfWeek.value]?.toFloat() ?: 0f
-                    Entry(day.toFloat(), taskRate)
+                val daysInMonth = calculateDaysInPeriod(StatisticPeriod.MONTH)
+                (0 until daysInMonth).map { day ->
+                    val date = now.withDayOfMonth(1).plusDays(day.toLong())
+                    val tasks = taskMetrics.dayOfWeekDistribution[date.dayOfWeek.value] ?: 0
+                    Entry(day.toFloat(), tasks.toFloat())
                 }
             }
             StatisticPeriod.YEAR -> {
                 (0..11).map { month ->
-                    val date = YearMonth.now().minusMonths(11 - month.toLong())
-                    Entry(month.toFloat(), (month + 1).toFloat() * 2) // Заглушка для демонстрации
+                    Entry(month.toFloat(), ((month % 6) + 1).toFloat() * 5f) // Заглушка для демонстрации
                 }
             }
         }
-        _timelineChartData.value = timelineData
 
-        // Круговые диаграммы для общих метрик
+        // Круговая диаграмма общей производительности
         val productivityPie = listOf(
-            PieEntry(productivity.taskCompletionRate.toFloat(), "Задачи"),
-            PieEntry(productivity.habitCompletionRate.toFloat(), "Привычки"),
-            PieEntry(productivity.focusTimeMinutes.toFloat() / 60f, "Фокус (ч)")
+            PieEntry(productivityMetrics.taskCompletionRate.toFloat(), "Задачи"),
+            PieEntry(productivityMetrics.habitCompletionRate.toFloat(), "Привычки"),
+            PieEntry(productivityMetrics.focusTimeMinutes.toFloat() / 60f, "Фокус (ч)")
         )
 
-        val pieData = mapOf(
-            "productivity" to productivityPie
+        return StatisticsChartData(
+            timelineEntries = timelineData,
+            pieCharts = mapOf("productivity" to productivityPie),
+            xAxisLabels = generateXAxisLabels(period)
         )
-        _pieChartData.value = pieData
     }
 
-    private fun updateTaskCharts() {
-        val tasks = _taskMetrics.value ?: return
+    /**
+     * Генерирует данные для графиков задач
+     */
+    private fun generateTaskChartData(metricsData: StatisticsMetricsData): StatisticsChartData {
+        val taskMetrics = metricsData.taskMetrics ?: return StatisticsChartData()
 
-        // Данные для круговой диаграммы приоритетов
+        // Круговая диаграмма приоритетов задач
         val priorityPie = listOf(
-            PieEntry(tasks.priorityDistribution[TaskPriority.LOW]?.toFloat() ?: 0f, "Низкий"),
-            PieEntry(tasks.priorityDistribution[TaskPriority.MEDIUM]?.toFloat() ?: 0f, "Средний"),
-            PieEntry(tasks.priorityDistribution[TaskPriority.HIGH]?.toFloat() ?: 0f, "Высокий")
+            PieEntry(taskMetrics.priorityDistribution.getValue(TaskPriority.LOW).toFloat(), "Низкий"),
+            PieEntry(taskMetrics.priorityDistribution.getValue(TaskPriority.MEDIUM).toFloat(), "Средний"),
+            PieEntry(taskMetrics.priorityDistribution.getValue(TaskPriority.HIGH).toFloat(), "Высокий")
         )
 
-
-        // Данные для круговой диаграммы статусов
+        // Круговая диаграмма статусов задач
         val statusPie = listOf(
-            PieEntry(tasks.completedTasks.toFloat(), "Выполнено"),
-            PieEntry((tasks.totalTasks - tasks.completedTasks).toFloat(), "Не выполнено")
+            PieEntry(taskMetrics.completedTasks.toFloat(), "Выполнено"),
+            PieEntry((taskMetrics.totalTasks - taskMetrics.completedTasks).toFloat(), "Активно")
         )
 
-        // Данные для линейного графика выполнения задач по дням недели
+        // Линейный график по дням недели
         val dayOfWeekData = (1..7).map { day ->
-            Entry((day - 1).toFloat(), tasks.dayOfWeekDistribution[day]?.toFloat() ?: 0f)
+            Entry((day - 1).toFloat(), taskMetrics.dayOfWeekDistribution[day]?.toFloat() ?: 0f)
         }
 
-        _timelineChartData.value = dayOfWeekData
-        _pieChartData.value = mapOf(
-            "priority" to priorityPie,
-            "status" to statusPie
+        return StatisticsChartData(
+            timelineEntries = dayOfWeekData,
+            pieCharts = mapOf(
+                "priority" to priorityPie,
+                "status" to statusPie
+            ),
+            xAxisLabels = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
         )
     }
 
-    private fun updateHabitCharts() {
-        val habits = _habitMetrics.value ?: return
+    /**
+     * Генерирует данные для графиков привычек
+     */
+    private fun generateHabitChartData(metricsData: StatisticsMetricsData): StatisticsChartData {
+        val habitMetrics = metricsData.habitMetrics ?: return StatisticsChartData()
 
-        // Данные для круговой диаграммы типов привычек
+        // Круговая диаграмма типов привычек
         val typePie = listOf(
-            PieEntry(habits.typeDistribution[HabitType.BINARY]?.toFloat() ?: 0f, "Бинарные"),
-            PieEntry(habits.typeDistribution[HabitType.QUANTITY]?.toFloat() ?: 0f, "Количественные"),
-            PieEntry(habits.typeDistribution[HabitType.TIME]?.toFloat() ?: 0f, "Временные")
+            PieEntry(habitMetrics.typeDistribution.getValue(HabitType.BINARY).toFloat(), "Бинарные"),
+            PieEntry(habitMetrics.typeDistribution.getValue(HabitType.QUANTITY).toFloat(), "Количественные"),
+            PieEntry(habitMetrics.typeDistribution.getValue(HabitType.TIME).toFloat(), "Временные")
         )
 
-        // Данные для круговой диаграммы статусов привычек
+        // Круговая диаграмма статусов привычек
         val statusPie = listOf(
-            PieEntry(habits.activeHabits.toFloat(), "Активные"),
-            PieEntry((habits.totalHabits - habits.activeHabits).toFloat(), "Неактивные")
+            PieEntry(habitMetrics.activeHabits.toFloat(), "Активные"),
+            PieEntry((habitMetrics.totalHabits - habitMetrics.activeHabits).toFloat(), "Неактивные")
         )
 
-        // Данные для линейного графика выполнения привычек по топ 5 привычкам
-        val habitData = habits.habitData.sortedByDescending { it.completionRate }.take(5)
-        val habitEntries = habitData.mapIndexed { index, data ->
-            Entry(index.toFloat(), data.completionRate.toFloat() * 100)
-        }
+        // Линейный график выполнения топ-5 привычек
+        val habitEntries = habitMetrics.habitData
+            .sortedByDescending { it.completionRate }
+            .take(5)
+            .mapIndexed { index, data ->
+                Entry(index.toFloat(), (data.completionRate * 100).toFloat())
+            }
 
-        _timelineChartData.value = habitEntries
-        _pieChartData.value = mapOf(
-            "type" to typePie,
-            "status" to statusPie
+        // Создаем метки для оси X из названий привычек
+        val habitLabels = habitMetrics.habitData
+            .sortedByDescending { it.completionRate }
+            .take(5)
+            .map { it.habit.title.take(10) + if (it.habit.title.length > 10) "..." else "" }
+
+        return StatisticsChartData(
+            timelineEntries = habitEntries,
+            pieCharts = mapOf(
+                "type" to typePie,
+                "status" to statusPie
+            ),
+            xAxisLabels = habitLabels
         )
     }
 
-    private fun updatePomodoroCharts() {
-        val pomodoro = _pomodoroMetrics.value ?: return
+    /**
+     * Генерирует данные для графиков помодоро
+     */
+    private fun generatePomodoroChartData(metricsData: StatisticsMetricsData): StatisticsChartData {
+        val pomodoroMetrics = metricsData.pomodoroMetrics ?: return StatisticsChartData()
 
-        // Данные для круговой диаграммы завершенных сессий
+        // Круговая диаграмма сессий
         val sessionsPie = listOf(
-            PieEntry(pomodoro.completedSessions.toFloat(), "Завершенные"),
-            PieEntry(pomodoro.incompleteSessions.toFloat(), "Незавершенные")
+            PieEntry(pomodoroMetrics.completedSessions.toFloat(), "Завершенные"),
+            PieEntry(pomodoroMetrics.incompleteSessions.toFloat(), "Незавершенные")
         )
 
-        // Данные для линейного графика времени фокуса по дням
+        // Линейный график времени фокуса по дням
+        val daysInPeriod = _periodsData.value.daysInSelectedPeriod
         val now = LocalDate.now()
-        val daysInPeriod = _daysInSelectedPeriod.value
 
-        val focusTimeData = (0 until daysInPeriod).map { day ->
-            val date = now.minusDays((daysInPeriod - 1 - day).toLong())
-            val focusTime = pomodoro.dailyDistribution[date]?.toFloat() ?: 0f
-            Entry(day.toFloat(), focusTime)
+        val focusTimeData = when (_selectedPeriod.value) {
+            StatisticPeriod.DAY -> {
+                listOf(Entry(0f, pomodoroMetrics.totalFocusTimeMinutes.toFloat()))
+            }
+            StatisticPeriod.WEEK -> {
+                (0..6).map { day ->
+                    val date = now.minusDays((6 - day).toLong())
+                    val focusTime = pomodoroMetrics.dailyDistribution[date]?.toFloat() ?: 0f
+                    Entry(day.toFloat(), focusTime)
+                }
+            }
+            StatisticPeriod.MONTH -> {
+                val days = calculateDaysInPeriod(StatisticPeriod.MONTH)
+                (0 until days).map { day ->
+                    val date = now.withDayOfMonth(1).plusDays(day.toLong())
+                    val focusTime = pomodoroMetrics.dailyDistribution[date]?.toFloat() ?: 0f
+                    Entry(day.toFloat(), focusTime)
+                }
+            }
+            StatisticPeriod.YEAR -> {
+                (0..11).map { month ->
+                    val yearMonth = YearMonth.now().withMonth(month + 1)
+                    val focusTime = pomodoroMetrics.dailyDistribution
+                        .filterKeys { it.month.value == month + 1 && it.year == now.year }
+                        .values
+                        .sum()
+                        .toFloat()
+                    Entry(month.toFloat(), focusTime)
+                }
+            }
         }
 
-        _timelineChartData.value = focusTimeData
-        _pieChartData.value = mapOf(
-            "sessions" to sessionsPie
+        return StatisticsChartData(
+            timelineEntries = focusTimeData,
+            pieCharts = mapOf("sessions" to sessionsPie),
+            xAxisLabels = generateXAxisLabels(_selectedPeriod.value)
         )
     }
 
-    private fun generateSummaryStatistics() {
-        val productivity = _productivityMetrics.value ?: return
-        val tasks = _taskMetrics.value ?: return
-        val habits = _habitMetrics.value ?: return
-        val pomodoro = _pomodoroMetrics.value ?: return
+    /**
+     * Генерирует метки для оси X в зависимости от периода
+     */
+    private fun generateXAxisLabels(period: StatisticPeriod): List<String> {
+        val now = LocalDate.now()
+        val dateFormatter = DateTimeFormatter.ofPattern("dd.MM")
+        val monthFormatter = DateTimeFormatter.ofPattern("MMM")
+
+        return when (period) {
+            StatisticPeriod.DAY -> listOf(now.format(dateFormatter))
+            StatisticPeriod.WEEK -> (0..6).map {
+                now.minusDays((6 - it).toLong()).format(dateFormatter)
+            }
+            StatisticPeriod.MONTH -> {
+                val days = calculateDaysInPeriod(StatisticPeriod.MONTH)
+                (0 until days).map {
+                    if (it % 5 == 0) now.withDayOfMonth(1).plusDays(it.toLong()).format(dateFormatter)
+                    else ""
+                }
+            }
+            StatisticPeriod.YEAR -> (1..12).map {
+                now.withMonth(it).format(monthFormatter)
+            }
+        }
+    }
+
+    /**
+     * Генерирует сводные статистические данные
+     */
+    private fun generateSummaryStatistics(metricsData: StatisticsMetricsData?): Map<String, String> {
+        if (metricsData == null) return emptyMap()
+
+        val productivity = metricsData.productivityMetrics
+        val tasks = metricsData.taskMetrics
+        val habits = metricsData.habitMetrics
+        val pomodoro = metricsData.pomodoroMetrics
+
+        if (productivity == null || tasks == null || habits == null || pomodoro == null) {
+            return emptyMap()
+        }
 
         val summary = mutableMapOf<String, String>()
 
-        // Форматирование для процентов и времени
-        val percentFormatter = { value: Double ->
-            if (value.isNaN()) "0.0%" else "%.1f%%".format(value)
-        }
+        // Форматирование процентов и времени
+        val percentFormatter = { value: Double -> if (value.isNaN()) "0.0%" else "%.1f%%".format(value) }
         val hourFormatter = { value: Double -> "%.1f ч".format(value) }
 
         // Общие метрики
-        val taskCompletionPercent = if (productivity.taskCompletionRate.isNaN())
-            0.0 else productivity.taskCompletionRate
-        summary["Выполнено задач"] = "${tasks.completedTasks} из ${tasks.totalTasks} (${percentFormatter(taskCompletionPercent)})"
-
-        val habitCompletionPercent = if (productivity.habitCompletionRate.isNaN())
-            0.0 else productivity.habitCompletionRate
-        summary["Выполнено привычек"] = percentFormatter(habitCompletionPercent)
-
+        summary["Выполнено задач"] = "${tasks.completedTasks} из ${tasks.totalTasks} (${percentFormatter(productivity.taskCompletionRate)})"
+        summary["Выполнено привычек"] = percentFormatter(productivity.habitCompletionRate)
         summary["Время фокуса"] = hourFormatter(pomodoro.totalFocusTimeMinutes / 60.0)
         summary["Сессий Pomodoro"] = "${pomodoro.completedSessions} завершено"
         summary["Текущая серия"] = "${habits.currentStreak} дней"
@@ -552,32 +747,89 @@ class StatisticsViewModel @Inject constructor(
         summary["Среднее время на задачу"] = "${tasks.averageCompletionTimeMinutes / 60} часов"
         summary["Ежедневный фокус"] = "${pomodoro.averageDailyMinutes} минут"
 
-        _summaryStats.value = summary
+        return summary
     }
 
+    /**
+     * Экспортирует статистические данные (заглушка)
+     */
     private fun exportStatisticsData() {
-        // Этот метод будет реализован для экспорта статистики в CSV или PDF
-        // Здесь будет логика подготовки данных для экспорта
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            delay(1000) // Имитация экспорта
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    message = "Статистика экспортирована"
+                )
+            }
+            delay(3000) // Время показа сообщения
+            _uiState.update { it.copy(message = null) }
+        }
     }
+
+    /**
+     * Контейнер для всех метрик
+     */
+    private data class StatisticsMetricsData(
+        var productivityMetrics: ProductivityMetrics? = null,
+        var taskMetrics: TaskMetrics? = null,
+        var habitMetrics: HabitMetrics? = null,
+        var pomodoroMetrics: PomodoroMetrics? = null
+    )
 }
 
-enum class StatisticPeriod(val value: Int, val displayName: String) {
-    DAY(0, "День"),
-    WEEK(1, "Неделя"),
-    MONTH(2, "Месяц"),
-    YEAR(3, "Год")
-}
+/**
+ * Состояние представления для объединенных данных UI
+ */
+data class StatisticsViewState(
+    val isLoading: Boolean = true,
+    val error: String? = null,
+    val message: String? = null,
+    val selectedPeriod: StatisticPeriod = StatisticPeriod.WEEK,
+    val selectedTab: StatisticsTab = StatisticsTab.TASKS,
+    val selectedDate: LocalDate = LocalDate.now()
+)
 
-// Вкладки в экране статистики
+/**
+ * Данные для отображения периодов
+ */
+data class StatisticsPeriodsData(
+    val availableMonths: List<YearMonth> = emptyList(),
+    val availableYears: List<Int> = emptyList(),
+    val daysInSelectedPeriod: Int = 7
+)
+
+/**
+ * Данные для графиков
+ */
+data class StatisticsChartData(
+    val timelineEntries: List<Entry> = emptyList(),
+    val pieCharts: Map<String, List<PieEntry>> = emptyMap(),
+    val xAxisLabels: List<String> = emptyList()
+)
+
+/**
+ * UI состояние экрана
+ */
+data class StatisticsUiState(
+    val isLoading: Boolean = true,
+    val error: String? = null,
+    val message: String? = null
+)
+
+/**
+ * Вкладки в экране статистики
+ */
 enum class StatisticsTab(val title: String) {
-    PRODUCTIVITY("Общее"),
     TASKS("Задачи"),
     HABITS("Привычки"),
     POMODORO("Pomodoro")
 }
 
-
-// Actions для взаимодействия с ViewModel
+/**
+ * Actions для взаимодействия с ViewModel
+ */
 sealed class StatisticsAction {
     data class SetPeriod(val period: StatisticPeriod) : StatisticsAction()
     data class SetTab(val tab: StatisticsTab) : StatisticsAction()
@@ -586,13 +838,9 @@ sealed class StatisticsAction {
     object ExportStatistics : StatisticsAction()
 }
 
-// UI состояние экрана
-data class StatisticsUiState(
-    val isLoading: Boolean = true,
-    val error: String? = null
-)
-
-// Модель метрик производительности
+/**
+ * Модель метрик производительности
+ */
 data class ProductivityMetrics(
     val taskCompletionRate: Double = 0.0,
     val habitCompletionRate: Double = 0.0,
@@ -601,8 +849,9 @@ data class ProductivityMetrics(
     val daysAnalyzed: Int = 0
 )
 
-
-// Модель метрик задач
+/**
+ * Модель метрик задач
+ */
 data class TaskMetrics(
     val completedTasks: Int = 0,
     val totalTasks: Int = 0,
@@ -612,7 +861,9 @@ data class TaskMetrics(
     val averageCompletionTimeMinutes: Int = 0
 )
 
-// Модель метрик привычек
+/**
+ * Модель метрик привычек
+ */
 data class HabitMetrics(
     val activeHabits: Int = 0,
     val totalHabits: Int = 0,
@@ -624,14 +875,18 @@ data class HabitMetrics(
     val habitData: List<HabitData> = emptyList()
 )
 
-// Дополнительная модель для данных конкретной привычки
+/**
+ * Дополнительная модель для данных конкретной привычки
+ */
 data class HabitData(
     val habit: Habit,
     val tracking: List<HabitTracking>,
     val completionRate: Double
 )
 
-// Модель метрик Pomodoro
+/**
+ * Модель метрик Pomodoro
+ */
 data class PomodoroMetrics(
     val totalFocusTimeMinutes: Int = 0,
     val completedSessions: Int = 0,

@@ -14,34 +14,42 @@ class NotificationMapper @Inject constructor() {
             try {
                 Json.decodeFromString<List<Int>>(daysJson)
             } catch (e: Exception) {
-                null
+                emptyList<Int>() // Возвращаем пустой список вместо null
             }
-        }
+        } ?: emptyList() // Если daysOfWeek равен null, возвращаем пустой список
 
         return Notification(
             id = entity.notificationId,
             targetId = entity.targetId,
             targetType = NotificationTarget.fromInt(entity.targetType),
-            time = entity.time,
-            daysOfWeek = daysOfWeek,
+            time = entity.time ?: "09:00", // Используем дефолтное значение, если null
+            daysOfWeek = daysOfWeek, // Теперь точно не null
             isEnabled = entity.isEnabled,
             message = entity.message,
             workId = entity.workId,
-            repeatInterval = entity.repeatInterval
+            repeatInterval = entity.repeatInterval,
+            scheduledDate = entity.scheduledDate // Новое поле с датой
         )
     }
 
     fun mapToEntity(domain: Notification): NotificationEntity {
+        val daysOfWeekJson = if (domain.daysOfWeek.isNotEmpty()) {
+            Json.encodeToString(domain.daysOfWeek)
+        } else {
+            null
+        }
+
         val entity = NotificationEntity(
             notificationId = domain.id,
             targetId = domain.targetId,
             targetType = domain.targetType.value,
             time = domain.time,
-            daysOfWeek = domain.daysOfWeek?.let { Json.encodeToString(it) },
+            daysOfWeek = daysOfWeekJson,
             isEnabled = domain.isEnabled,
             message = domain.message,
             workId = domain.workId,
-            repeatInterval = domain.repeatInterval
+            repeatInterval = domain.repeatInterval,
+            scheduledDate = domain.scheduledDate // Добавляем дату
         )
         Log.d("NotificationMapper", "Mapped to entity: ${entity.notificationId}, workId=${entity.workId}")
         return entity
